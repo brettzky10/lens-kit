@@ -1,0 +1,104 @@
+"use client";
+
+import * as React from "react";
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  BackgroundVariant,
+  type ReactFlowInstance,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+
+import { useFlowStore } from "@/lib/flowStore";
+import type { FlowNodeType } from "@/lib/types";
+
+import PromptNode from "./nodes/PromptNode";
+import CameraNode from "./nodes/CameraNode";
+import LensNode from "./nodes/LensNode";
+import ImageNode from "./nodes/ImageNode";
+import VideoNode from "./nodes/VideoNode";
+import RemovableEdge from "./edges/RemovableEdge";
+import NodeContextMenu from "./NodeContextMenu";
+import BottomSetupPanel from "./BottomSetupPanel";
+import FlowToolbar from "./FlowToolbar";
+import CharacterNode from "./nodes/CharacterNode";
+import ReferenceImageNode from "./nodes/ReferenceImageNode";
+import SheetNode from "./nodes/SheetNode";
+import ReferenceNode from "./nodes/ReferenceNode";
+
+const nodeTypes = {
+  prompt: PromptNode,
+  camera: CameraNode,
+  lens: LensNode,
+  image: ImageNode,
+  video: VideoNode,
+  object: SheetNode,
+  location: SheetNode,
+  character: SheetNode, //character: CharacterNode,
+  reference: ReferenceNode,//ReferenceImageNode,
+};
+
+const edgeTypes = {
+  removable: RemovableEdge,
+};
+
+export default function FlowCanvas() {
+  const nodes = useFlowStore((s) => s.nodes);
+  const edges = useFlowStore((s) => s.edges);
+  const onNodesChange = useFlowStore((s) => s.onNodesChange);
+  const onEdgesChange = useFlowStore((s) => s.onEdgesChange);
+  const onConnect = useFlowStore((s) => s.onConnect);
+  const addNode = useFlowStore((s) => s.addNode);
+
+  const [rfInstance, setRfInstance] = React.useState<ReactFlowInstance | null>(null);
+  const [menu, setMenu] = React.useState<{ x: number; y: number } | null>(null);
+
+  const onPaneContextMenu = React.useCallback((event: React.MouseEvent | MouseEvent) => {
+    event.preventDefault();
+    const anyEvent = event as MouseEvent;
+    setMenu({ x: anyEvent.clientX, y: anyEvent.clientY });
+  }, []);
+
+  function handleSelectNodeType(type: FlowNodeType) {
+    if (!rfInstance || !menu) return;
+    const position = rfInstance.screenToFlowPosition({ x: menu.x, y: menu.y });
+    addNode(type, position);
+  }
+
+  return (
+    <div className="relative h-screen w-full bg-background">
+      <FlowToolbar />
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onInit={setRfInstance}
+        onPaneContextMenu={onPaneContextMenu}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ type: "removable" }}
+        fitView
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} className="opacity-40" />
+        <Controls showInteractive={false} />
+        <MiniMap pannable zoomable nodeStrokeWidth={2} />
+      </ReactFlow>
+
+      {menu && (
+        <NodeContextMenu
+          x={menu.x}
+          y={menu.y}
+          onSelect={handleSelectNodeType}
+          onClose={() => setMenu(null)}
+        />
+      )}
+
+      <BottomSetupPanel />
+    </div>
+  );
+}
