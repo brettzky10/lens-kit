@@ -13,7 +13,7 @@ export default function AuthPage() {
         Cloud autosave and account sync aren&apos;t wired up yet. For now, use
         &quot;Save flow&quot; to export your work as a JSON file you can import again later.
       </p>
-      <Button asChild variant="secondary">
+      <Button variant="secondary">
         <Link href="/flow">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to the editor
