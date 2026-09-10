@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { CAMERAS } from "./cameraData";
 import { LENSES } from "./lensData";
+import { SHOTS } from "./shotsData";
 import { isSheetKind } from "./types";
 import type {
   AnyNodeData,
@@ -10,6 +11,8 @@ import type {
   PromptNodeData,
   ReferenceNodeData,
   SheetNodeData,
+  ShotNodeData,
+  VideoNodeData,
 } from "./types";
 
 type FlowNode = Node<AnyNodeData>;
@@ -34,6 +37,11 @@ function textContribution(node: FlowNode): string | null {
   if (isSheetKind(data.kind)) {
     const d = data as SheetNodeData;
     return d.outputPrompt?.trim() ? d.outputPrompt.trim() : null;
+  }
+  if (data.kind === "shot") {
+    const d = data as ShotNodeData;
+    const shot = SHOTS.find((s) => s.id === d.selectedShotId);
+    return shot ? shot.prompt : null;
   }
   return null;
 }
@@ -168,4 +176,62 @@ export function collectUpstreamImageRefs(
   visit(nodeId, true);
   // flux-2-max's `input_images` field accepts at most 8 images.
   return refs.slice(0, 8);
+}
+
+function videoContribution(node: FlowNode): string[] {
+  const data = node.data as AnyNodeData;
+  if (data.kind === "shot") {
+    const d = data as ShotNodeData;
+    const shot = SHOTS.find((s) => s.id === d.selectedShotId);
+    return shot ? [shot.videoUrl] : [];
+  }
+  if (data.kind === "video") {
+    const d = data as VideoNodeData;
+    return d.videoUrl ? [d.videoUrl] : [];
+  }
+  return [];
+}
+
+/**
+ * Walk upstream and collect connected Shot / Video node video clip URLs
+ * (e.g. flux-3's start_video — take the first one — or Seedance 2.5's
+ * reference_videos array, or the Upscale node's single input_video). Same
+ * `rootHandleId` behavior as the other traversal helpers, and the same
+ * leaf treatment as sheet/image nodes: a Shot/Video ancestor contributes
+ * its own clip but we don't keep walking past it into whatever fed it.
+ */
+export function collectUpstreamVideoRefs(
+  nodeId: string,
+  nodes: FlowNode[],
+  edges: Edge[],
+  rootHandleId?: string | null
+): string[] {
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const visited = new Set<string>();
+  const refs: string[] = [];
+
+  function visit(id: string, isRoot: boolean) {
+    if (visited.has(id)) return;
+    visited.add(id);
+
+    const node = nodeById.get(id);
+    const kind = node ? (node.data as AnyNodeData).kind : undefined;
+    const isVideoSourceLeaf = !isRoot && (kind === "shot" || kind === "video");
+
+    if (!isRoot && node) refs.push(...videoContribution(node));
+
+    if (!isVideoSourceLeaf) {
+      let incoming = edges.filter((e) => e.target === id);
+      if (isRoot && rootHandleId !== undefined) {
+        incoming = incoming.filter((e) => (e.targetHandle ?? null) === rootHandleId);
+      }
+      for (const e of incoming) {
+        visit(e.source, false);
+      }
+    }
+  }
+
+  visit(nodeId, true);
+  // Seedance 2.5's reference_videos accepts up to 10.
+  return refs.slice(0, 10);
 }

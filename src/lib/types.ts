@@ -7,7 +7,9 @@ export type FlowNodeType =
   | "character"
   | "object"
   | "location"
-  | "reference";
+  | "reference"
+  | "shot"
+  | "upscale";
 
 // The three "sheet generator" node kinds share identical structure/behavior
 // (2 inputs: prompt + image refs; 2 outputs: sheet images + output prompt) —
@@ -61,7 +63,7 @@ export interface VideoNodeData {
   duration: string;
   resolution: string;
   aspectRatio: string;
-  provider: "flux" | "local";
+  provider: "flux" | "seedance" | "minimax" | "local";
 }
 
 /** Shared data shape for Character / Object / Location "sheet" nodes. */
@@ -88,6 +90,28 @@ export interface ReferenceNodeData {
   fileName?: string;
 }
 
+/** A picked camera-move shot, exporting both its prompt and its video clip. */
+export interface ShotNodeData {
+  [key: string]: unknown;
+  kind: "shot";
+  selectedShotId?: string;
+}
+
+/** Upscales a connected video clip via black-forest-labs/flux-video-upscale. */
+export interface UpscaleNodeData {
+  [key: string]: unknown;
+  kind: "upscale";
+  status: "idle" | "loading" | "done" | "error";
+  progress: number;
+  videoUrl?: string;
+  // Optional description of the clip's content to steer added detail.
+  prompt: string;
+  creativity: 0 | 1;
+  upscaleFactor: number;
+  safetyTolerance: number;
+  provider: "flux" | "local";
+}
+
 export type AnyNodeData =
   | PromptNodeData
   | CameraNodeData
@@ -95,7 +119,9 @@ export type AnyNodeData =
   | ImageNodeData
   | VideoNodeData
   | SheetNodeData
-  | ReferenceNodeData;
+  | ReferenceNodeData
+  | ShotNodeData
+  | UpscaleNodeData;
 
 export const NODE_TYPE_META: Record<
   FlowNodeType,
@@ -121,5 +147,13 @@ export const NODE_TYPE_META: Record<
   reference: {
     label: "Reference",
     description: "Drop in an image to use as a reference elsewhere",
+  },
+  shot: {
+    label: "Shot",
+    description: "Pick a camera-move shot — exports its prompt and its video clip",
+  },
+  upscale: {
+    label: "Upscale",
+    description: "Upscale a connected video clip",
   },
 };

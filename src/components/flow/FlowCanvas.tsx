@@ -19,14 +19,14 @@ import CameraNode from "./nodes/CameraNode";
 import LensNode from "./nodes/LensNode";
 import ImageNode from "./nodes/ImageNode";
 import VideoNode from "./nodes/VideoNode";
+import SheetNode from "./nodes/SheetNode";
+import ReferenceNode from "./nodes/ReferenceNode";
+import ShotNode from "./nodes/ShotNode";
+import UpscaleNode from "./nodes/UpscaleNode";
 import RemovableEdge from "./edges/RemovableEdge";
 import NodeContextMenu from "./NodeContextMenu";
 import BottomSetupPanel from "./BottomSetupPanel";
 import FlowToolbar from "./FlowToolbar";
-import CharacterNode from "./nodes/CharacterNode";
-import ReferenceImageNode from "./nodes/ReferenceImageNode";
-import SheetNode from "./nodes/SheetNode";
-import ReferenceNode from "./nodes/ReferenceNode";
 
 const nodeTypes = {
   prompt: PromptNode,
@@ -34,10 +34,12 @@ const nodeTypes = {
   lens: LensNode,
   image: ImageNode,
   video: VideoNode,
+  character: SheetNode,
   object: SheetNode,
   location: SheetNode,
-  character: SheetNode, //character: CharacterNode,
-  reference: ReferenceNode,//ReferenceImageNode,
+  reference: ReferenceNode,
+  shot: ShotNode,
+  upscale: UpscaleNode,
 };
 
 const edgeTypes = {

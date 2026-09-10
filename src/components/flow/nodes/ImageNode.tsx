@@ -18,6 +18,7 @@ import {
 import { isValidPromptSource, isValidImageRefSource } from "@/lib/connectionValidators";
 import { IMAGE_PROVIDERS } from "@/lib/providerOptions";
 import { downloadUrl } from "@/lib/downloadFile";
+import { useHandleSync } from "@/lib/useHandleSync";
 import type { ImageNodeData } from "@/lib/types";
 import NodeShell from "./NodeShell";
 import PromptPreview from "./PromptPreview";
@@ -55,6 +56,8 @@ export default function ImageNode({ id, data, selected }: NodeProps) {
     (connection: Connection | Edge) => isValidImageRefSource(connection, nodes as any),
     [nodes]
   );
+
+  useHandleSync(id, [id, imageRefs.length, fallbackNotice, imgData.status]);
 
   async function handleGenerate() {
     setFallbackNotice(null);

@@ -20,6 +20,7 @@ import {
   DEFAULT_VIDEO_ASPECT_RATIO,
 } from "./videoOptions";
 import { DEFAULT_IMAGE_PROVIDER, DEFAULT_VIDEO_PROVIDER } from "./providerOptions";
+import { DEFAULT_CREATIVITY, DEFAULT_UPSCALE_FACTOR, DEFAULT_SAFETY_TOLERANCE } from "./upscaleOptions";
 
 type FlowNode = Node<AnyNodeData>;
 
@@ -77,6 +78,19 @@ function defaultDataFor(type: FlowNodeType): AnyNodeData {
       };
     case "reference":
       return { kind: "reference" };
+    case "shot":
+      return { kind: "shot" };
+    case "upscale":
+      return {
+        kind: "upscale",
+        status: "idle",
+        progress: 0,
+        prompt: "",
+        creativity: DEFAULT_CREATIVITY,
+        upscaleFactor: DEFAULT_UPSCALE_FACTOR,
+        safetyTolerance: DEFAULT_SAFETY_TOLERANCE,
+        provider: DEFAULT_IMAGE_PROVIDER,
+      };
   }
 }
 
@@ -178,9 +192,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   importFlow: (json) => {
     try {
       const parsed = JSON.parse(json);
+      // Backfill every imported node's data against this version's full
+      // default shape for its type, with the imported values taking
+      // priority. Without this, a flow exported from an earlier version of
+      // the app (before some field existed on a node type) would produce
+      // nodes missing newer required fields, which crashes that node's
+      // component when it reads e.g. `data.prompt` directly.
+      const nodes = (parsed.nodes ?? []).map((n: any) => ({
+        ...n,
+        data: { ...defaultDataFor(n.type), ...(n.data ?? {}) },
+      }));
       set({
         flowName: parsed.flowName ?? "Imported Flow",
-        nodes: parsed.nodes ?? [],
+        nodes,
         edges: parsed.edges ?? [],
       });
     } catch (e) {

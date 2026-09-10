@@ -21,6 +21,7 @@ import { isValidPromptSource, isValidImageRefSource } from "@/lib/connectionVali
 import { SHEET_CONFIGS } from "@/lib/sheetConfig";
 import { IMAGE_PROVIDERS } from "@/lib/providerOptions";
 import { downloadUrl } from "@/lib/downloadFile";
+import { useHandleSync } from "@/lib/useHandleSync";
 import type { SheetKind, SheetNodeData } from "@/lib/types";
 import NodeShell from "./NodeShell";
 import PromptPreview from "./PromptPreview";
@@ -63,6 +64,8 @@ export default function SheetNode({ id, data, selected }: NodeProps) {
     (connection: Connection | Edge) => isValidImageRefSource(connection, nodes as any),
     [nodes]
   );
+
+  useHandleSync(id, [id, referenceImages.length, fallbackNotice, sheetData.status]);
 
   async function handleGenerate() {
     setFallbackNotice(null);

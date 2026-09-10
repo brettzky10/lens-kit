@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { FileText, Camera, Aperture, ImageIcon, Film, User, ImageDown, Box, Mountain, ImagePlus } from "lucide-react";
+import { FileText, Camera, Aperture, ImageIcon, Film, User, Box, Mountain, ImagePlus, Clapperboard, ArrowUpCircle } from "lucide-react";
 import {
   Command,
   CommandGroup,
@@ -21,7 +21,9 @@ const ICONS: Record<FlowNodeType, React.ElementType> = {
   character: User,
   object: Box,
   location: Mountain,
-  reference: ImagePlus
+  reference: ImagePlus,
+  shot: Clapperboard,
+  upscale: ArrowUpCircle,
 };
 
 interface NodeContextMenuProps {
@@ -43,10 +45,14 @@ export default function NodeContextMenu({ x, y, onSelect, onClose }: NodeContext
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
-    document.addEventListener("mousedown", handleClick);
+    // Capture phase matters here: React Flow's pane has its own mousedown
+    // handling for panning/selection that can stopPropagation() during the
+    // bubble phase, which would otherwise stop this listener from ever
+    // seeing clicks that land on the canvas.
+    document.addEventListener("mousedown", handleClick, true);
     document.addEventListener("keydown", handleKey);
     return () => {
-      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("mousedown", handleClick, true);
       document.removeEventListener("keydown", handleKey);
     };
   }, [onClose]);
