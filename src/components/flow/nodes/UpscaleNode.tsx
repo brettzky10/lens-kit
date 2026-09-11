@@ -62,8 +62,8 @@ export default function UpscaleNode({ id, data, selected }: NodeProps) {
   const [downloading, setDownloading] = React.useState(false);
 
   const [localPrompt, setLocalPrompt] = React.useState(upData.prompt);
-  React.useEffect(() => setLocalPrompt(upData.prompt), [upData.prompt]);
-
+  /* React.useEffect(() => setLocalPrompt(upData.prompt), [upData.prompt]);
+ */
   const inputVideo = React.useMemo(
     () => collectUpstreamVideoRefs(id, nodes as any, edges, VIDEO_REF_HANDLE_ID)[0],
     [id, nodes, edges]
