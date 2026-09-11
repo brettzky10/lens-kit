@@ -24,6 +24,8 @@ import {
   DEFAULT_ASPECT_RATIO_BY_PROVIDER,
 } from "@/lib/videoOptions";
 import { VIDEO_PROVIDERS } from "@/lib/providerOptions";
+import type { VideoGenerationProvider } from "@/lib/providerOptions";
+
 import {
   PROMPT_HANDLE_ID,
   IMAGE_REFS_HANDLE_ID,
@@ -39,6 +41,7 @@ import { useHandleSync } from "@/lib/useHandleSync";
 import type { VideoNodeData } from "@/lib/types";
 import NodeShell from "./NodeShell";
 import PromptPreview from "./PromptPreview";
+
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -118,7 +121,7 @@ export default function VideoNode({ id, data, selected }: NodeProps) {
   const resolutionOptions = VIDEO_RESOLUTIONS_BY_PROVIDER[vidData.provider] ?? VIDEO_RESOLUTIONS_BY_PROVIDER.flux;
   const aspectRatioOptions = VIDEO_ASPECT_RATIOS_BY_PROVIDER[vidData.provider] ?? VIDEO_ASPECT_RATIOS_BY_PROVIDER.flux;
 
-  function handleProviderChange(v: string) {
+  /* function handleProviderChange(v: string) {
     const provider = v as VideoNodeData["provider"];
     updateNodeData(id, {
       provider,
@@ -129,7 +132,18 @@ export default function VideoNode({ id, data, selected }: NodeProps) {
       resolution: DEFAULT_RESOLUTION_BY_PROVIDER[provider],
       aspectRatio: DEFAULT_ASPECT_RATIO_BY_PROVIDER[provider],
     });
-  }
+  } */
+ function handleProviderChange(v: VideoGenerationProvider | null) {
+  if (v === null) return;
+
+  updateNodeData(id, {
+    provider: v,
+    duration: DEFAULT_DURATION_BY_PROVIDER[v],
+    resolution: DEFAULT_RESOLUTION_BY_PROVIDER[v],
+    aspectRatio: DEFAULT_ASPECT_RATIO_BY_PROVIDER[v],
+  });
+}
+
 
   async function handleGenerate() {
     setFallbackNotice(null);
@@ -247,7 +261,11 @@ export default function VideoNode({ id, data, selected }: NodeProps) {
         <Field label="Duration">
           <Select
             value={vidData.duration}
-            onValueChange={(v) => updateNodeData(id, { duration: v })}
+            onValueChange={(v) => {
+              if (v !== null) {
+                updateNodeData(id, { duration: v });
+              }
+            }}
           >
             <SelectTrigger>
               <SelectValue />
@@ -265,7 +283,11 @@ export default function VideoNode({ id, data, selected }: NodeProps) {
         <Field label="Resolution">
           <Select
             value={vidData.resolution}
-            onValueChange={(v) => updateNodeData(id, { resolution: v })}
+            onValueChange={(v) => {
+              if (v !== null) {
+                updateNodeData(id, { resolution: v });
+              }
+            }}
           >
             <SelectTrigger>
               <SelectValue />
@@ -283,7 +305,11 @@ export default function VideoNode({ id, data, selected }: NodeProps) {
         <Field label="Aspect ratio">
           <Select
             value={vidData.aspectRatio}
-            onValueChange={(v) => updateNodeData(id, { aspectRatio: v })}
+            onValueChange={(v) => {
+              if (v !== null) {
+                updateNodeData(id, { aspectRatio: v });
+              }
+            }}
           >
             <SelectTrigger>
               <SelectValue />
