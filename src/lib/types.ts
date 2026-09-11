@@ -112,6 +112,8 @@ export interface UpscaleNodeData {
   provider: "flux" | "local";
 }
 
+
+
 export type AnyNodeData =
   | PromptNodeData
   | CameraNodeData
