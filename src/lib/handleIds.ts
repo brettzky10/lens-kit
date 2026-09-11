@@ -41,3 +41,13 @@ export const IMAGE_HANDLE_CLASS =
   "!h-3 !w-3 !border-2 !border-background !bg-sky-400";
 export const VIDEO_REF_HANDLE_CLASS =
   "!h-3 !w-3 !border-2 !border-background !bg-violet-400";
+
+
+  // The Character node has two distinct *source* handles on its right edge —
+// one that outputs its generated character-sheet images (to feed a
+// downstream image-refs-in connector) and one that outputs its ~200-word
+// consistency prompt (to feed a downstream prompt-in connector).
+export const CHARACTER_IMAGE_OUT_ID = "character-image-out";
+export const CHARACTER_PROMPT_OUT_ID = "character-prompt-out";
+
+export const REFERENCE_IMAGE_OUT_ID = "reference-image-out";
