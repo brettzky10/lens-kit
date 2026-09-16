@@ -91,6 +91,9 @@ function defaultDataFor(type: FlowNodeType): AnyNodeData {
         safetyTolerance: DEFAULT_SAFETY_TOLERANCE,
         provider: DEFAULT_IMAGE_PROVIDER,
       };
+      case "lut":
+        return { kind: "lut", lutId: undefined, status: "idle", processedImage: undefined };
+    
   }
 }
 

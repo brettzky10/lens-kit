@@ -23,6 +23,7 @@ import SheetNode from "./nodes/SheetNode";
 import ReferenceNode from "./nodes/ReferenceNode";
 import ShotNode from "./nodes/ShotNode";
 import UpscaleNode from "./nodes/UpscaleNode";
+import LutNode from "./nodes/LutNode";
 import RemovableEdge from "./edges/RemovableEdge";
 import NodeContextMenu from "./NodeContextMenu";
 import BottomSetupPanel from "./BottomSetupPanel";
@@ -39,6 +40,7 @@ const nodeTypes = {
   location: SheetNode,
   reference: ReferenceNode,
   shot: ShotNode,
+  lut: LutNode,
   upscale: UpscaleNode,
 };
 

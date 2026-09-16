@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { FileText, Camera, Aperture, ImageIcon, Film, User, Box, Mountain, ImagePlus, Clapperboard, ArrowUpCircle } from "lucide-react";
+import { FileText, Camera, Aperture, ImageIcon, Film, User, Box, Mountain, ImagePlus, Clapperboard, ArrowUpCircle, Palette } from "lucide-react";
 import {
   Command,
   CommandGroup,
@@ -23,6 +23,7 @@ const ICONS: Record<FlowNodeType, React.ElementType> = {
   location: Mountain,
   reference: ImagePlus,
   shot: Clapperboard,
+  lut: Palette,
   upscale: ArrowUpCircle,
 };
 

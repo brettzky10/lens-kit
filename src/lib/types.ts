@@ -9,7 +9,8 @@ export type FlowNodeType =
   | "location"
   | "reference"
   | "shot"
-  | "upscale";
+  | "upscale"
+  | "lut";
 
 // The three "sheet generator" node kinds share identical structure/behavior
 // (2 inputs: prompt + image refs; 2 outputs: sheet images + output prompt) —
@@ -112,6 +113,14 @@ export interface UpscaleNodeData {
   provider: "flux" | "local";
 }
 
+/** Applies a color-grading "look" (LUT-style) to a connected image, entirely client-side. */
+export interface LutNodeData {
+  [key: string]: unknown;
+  kind: "lut";
+  lutId?: string;
+  status: "idle" | "processing" | "done" | "error";
+  processedImage?: string;
+}
 
 
 export type AnyNodeData =
@@ -123,7 +132,8 @@ export type AnyNodeData =
   | SheetNodeData
   | ReferenceNodeData
   | ShotNodeData
-  | UpscaleNodeData;
+  | UpscaleNodeData
+  | LutNodeData;
 
 export const NODE_TYPE_META: Record<
   FlowNodeType,
@@ -158,4 +168,10 @@ export const NODE_TYPE_META: Record<
     label: "Upscale",
     description: "Upscale a connected video clip",
   },
+  lut: {
+    label: "Color LUT",
+    description: "Apply a color-grading look to a connected image",
+  },
 };
+
+
