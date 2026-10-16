@@ -1,29 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import Replicate from "replicate";
 import { callLocalVideoApi } from "@/lib/localModelClient";
-import { SEEDANCE_MODEL_SLUG, MINIMAX_MODEL_SLUG } from "@/lib/providerOptions";
+import { VIDEO_MODEL_SLUGS, type VideoGenerationProvider } from "@/lib/providerOptions";
 
 /**
- * Video generation, with a choice of provider:
- *  - "flux" (default): Replicate's black-forest-labs/flux-3. Requires
- *    REPLICATE_API_TOKEN. Uses a single video reference as start_video
- *    (mutually exclusive with images per its schema — prefers start_video
- *    when present).
- *  - "seedance": Replicate's Seedance 2.5. Requires REPLICATE_API_TOKEN.
- *    Accepts BOTH reference_images and reference_videos simultaneously
- *    (they're only mutually exclusive with the single first/last-frame
- *    image fields, which this app doesn't expose).
- *  - "minimax": Replicate's MiniMax H3. Requires REPLICATE_API_TOKEN.
- *    Also accepts both reference_image_urls and reference_video_urls
- *    together; its aspect-ratio field is named "ratio", not
- *    "aspect_ratio".
- *  - "local": your own network-hosted model. Requires LOCAL_VIDEO_API_URL
- *    (and optionally LOCAL_API_KEY) — see lib/localModelClient.ts for the
- *    assumed request/response contract, which you can adjust to match your
- *    server exactly.
- *
- * Falls back to a sample placeholder video when the chosen provider isn't
- * configured, or its call fails — and reports why in the response.
+ * Video generation by provider (all via Replicate except "local"):
+ *  - veo:      Veo 3.1. 1-2 images = start/end frame; 3 images = reference images (forces 16:9 + 8s).
+ *  - seedance: Seedance 2.5. Reference images AND reference videos together.
+ *  - flux:     Flux 3. A video reference becomes start_video (exclusive with images). Optional draft mode.
+ *  - wan:      Wan 3. Optional first-frame image.
+ *  - grok:     Grok Imagine Video 1.5. Image required.
+ *  - minimax:  Hailuo 2.3. Optional first-frame image. 1080p is 6s only.
+ *  - local:    your own server (lib/localModelClient.ts).
+ * Falls back to a sample video when the provider isn't configured or the call fails, and says why.
  */
 export async function POST(req: NextRequest) {
   const {
@@ -33,21 +22,22 @@ export async function POST(req: NextRequest) {
     duration = "auto",
     resolution = "720p",
     aspectRatio = "auto",
+    audio = true,
+    draft = false,
     provider = "flux",
   } = await req.json();
 
   const refImages: string[] = Array.isArray(imageRefs) ? imageRefs : [];
   const refVideos: string[] = Array.isArray(videoRefs) ? videoRefs : [];
 
-  // Shot/Video node clips are relative paths (e.g. "/shots/foo.mp4").
-  // Replicate needs a publicly resolvable absolute URL, so resolve them
-  // against this request's own origin. Note: this only actually works for
-  // Replicate once the app is deployed somewhere public — Replicate's
-  // servers can't fetch a URL pointing at your own localhost. A local model
-  // on the same machine/network may be able to fetch it, depending on setup.
+  // Relative paths (Shot clips, our own outputs) must be absolute for Replicate. This only works once
+  // the app is publicly reachable; Replicate can't fetch your localhost.
   const resolveUrl = (u: string) => (u.startsWith("/") ? new URL(u, req.nextUrl.origin).toString() : u);
-  const resolvedImageRefs = refImages.map(resolveUrl);
-  const resolvedVideoRefs = refVideos.map(resolveUrl);
+  const imgs = refImages.map(resolveUrl);
+  const vids = refVideos.map(resolveUrl);
+
+  const secs = parseInt(String(duration), 10);
+  const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
   function placeholder(fallbackReason: string) {
     return NextResponse.json({
@@ -60,12 +50,7 @@ export async function POST(req: NextRequest) {
   if (provider === "local") {
     try {
       const { url } = await callLocalVideoApi({
-        prompt,
-        imageRefs: resolvedImageRefs,
-        videoRefs: resolvedVideoRefs,
-        duration,
-        resolution,
-        aspectRatio,
+        prompt, imageRefs: imgs, videoRefs: vids, duration, resolution, aspectRatio,
       });
       return NextResponse.json({ videoUrl: url, fallback: false });
     } catch (err: any) {
@@ -74,95 +59,122 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const slug = VIDEO_MODEL_SLUGS[provider as Exclude<VideoGenerationProvider, "local">];
+  if (!slug) return NextResponse.json({ error: `Unknown video provider "${provider}"` }, { status: 400 });
+
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) {
     console.warn("REPLICATE_API_TOKEN is not set — serving a placeholder video instead of calling Replicate.");
     return placeholder("No REPLICATE_API_TOKEN set in the server environment.");
   }
 
-  try {
-    const replicate = new Replicate({ auth: token });
-
-    if (provider === "seedance") {
-      const input: Record<string, unknown> = {
+  // Build the model-specific input
+  let input: Record<string, unknown>;
+  switch (provider as Exclude<VideoGenerationProvider, "local">) {
+    case "veo": {
+      input = {
         prompt: prompt || "",
-        duration: parseInt(duration, 10) || 5,
+        duration: [4, 6, 8].includes(secs) ? secs : 8,
+        aspect_ratio: aspectRatio === "9:16" ? "9:16" : "16:9",
+        resolution: resolution === "720p" ? "720p" : "1080p",
+        generate_audio: audio !== false,
+      };
+      if (imgs.length >= 3) {
+        // reference-to-video only works at 16:9 and 8s
+        input.reference_images = imgs.slice(0, 3);
+        input.aspect_ratio = "16:9";
+        input.duration = 8;
+      } else {
+        if (imgs[0]) input.image = imgs[0];
+        if (imgs[1]) input.last_frame = imgs[1];
+      }
+      break;
+    }
+    case "seedance": {
+      input = {
+        prompt: prompt || "",
+        duration: Number.isFinite(secs) ? secs : 5, // -1 = model picks
         resolution,
         aspect_ratio: aspectRatio,
-        generate_audio: true,
+        generate_audio: audio !== false,
         watermark: false,
         output_format: "mp4",
       };
-      if (resolvedImageRefs.length > 0) input.reference_images = resolvedImageRefs.slice(0, 30);
-      if (resolvedVideoRefs.length > 0) input.reference_videos = resolvedVideoRefs.slice(0, 10);
-
-      const output = await replicate.run(SEEDANCE_MODEL_SLUG, { input });
-      const videoUrl = extractUrl(output);
-      if (!videoUrl) throw new Error("Could not extract a video URL from the Replicate response.");
-      return NextResponse.json({ videoUrl, fallback: false });
+      if (imgs.length) input.reference_images = imgs.slice(0, 30);
+      if (vids.length) input.reference_videos = vids.slice(0, 10);
+      break;
     }
-
-    if (provider === "minimax") {
-      const input: Record<string, unknown> = {
+    case "wan": {
+      input = {
         prompt: prompt || "",
-        duration: parseInt(duration, 10) || 6,
+        duration: clamp(Number.isFinite(secs) ? secs : 5, 2, 30),
         resolution,
-        // MiniMax H3 names its aspect-ratio field "ratio", not
-        // "aspect_ratio" — the schema says image-to-video mode requires
-        // "adaptive", which is exactly what our aspectRatio value already
-        // is when the person picks it.
-        ratio: aspectRatio,
+        aspect_ratio: aspectRatio,
+        enable_prompt_expansion: true,
       };
-      if (resolvedImageRefs.length > 0) input.reference_image_urls = resolvedImageRefs.slice(0, 30);
-      if (resolvedVideoRefs.length > 0) input.reference_video_urls = resolvedVideoRefs.slice(0, 10);
-
-      const output = await replicate.run(MINIMAX_MODEL_SLUG, { input });
-      const videoUrl = extractUrl(output);
-      if (!videoUrl) throw new Error("Could not extract a video URL from the Replicate response.");
-      return NextResponse.json({ videoUrl, fallback: false });
+      if (imgs[0]) input.image = imgs[0];
+      break;
     }
-
-    // provider === "flux"
-    const input: Record<string, unknown> = {
-      draft: false,
-      prompt,
-      duration,
-      resolution,
-      aspect_ratio: aspectRatio,
-      generate_audio: true,
-      safety_tolerance: 2,
-    };
-
-    // start_video and images are mutually exclusive per the flux-3 schema —
-    // prefer start_video (the first connected video reference) when present.
-    if (resolvedVideoRefs[0]) {
-      input.start_video = resolvedVideoRefs[0];
-    } else {
-      input.images = resolvedImageRefs;
+    case "grok": {
+      if (!imgs[0]) {
+        return NextResponse.json({ error: "Grok Imagine Video needs a connected image to animate." }, { status: 400 });
+      }
+      input = {
+        prompt: prompt || "",
+        image: imgs[0],
+        duration: clamp(Number.isFinite(secs) ? secs : 5, 1, 15),
+        resolution,
+        aspect_ratio: aspectRatio,
+      };
+      break;
     }
+    case "minimax": {
+      // Hailuo 2.3: 10s only at 768p; 1080p is 6s only. No aspect ratio (follows the first frame).
+      const res = resolution === "1080p" ? "1080p" : "768p";
+      input = {
+        prompt: prompt || "",
+        duration: res === "768p" && secs === 10 ? 10 : 6,
+        resolution: res,
+        prompt_optimizer: true,
+      };
+      if (imgs[0]) input.first_frame_image = imgs[0];
+      break;
+    }
+    default: {
+      // flux 3. start_video and images are mutually exclusive; prefer start_video.
+      input = {
+        draft: !!draft,
+        prompt,
+        duration,
+        resolution: draft ? "720p" : resolution,
+        aspect_ratio: aspectRatio,
+        generate_audio: audio !== false,
+        safety_tolerance: 2,
+      };
+      if (vids[0]) input.start_video = vids[0];
+      else input.images = imgs;
+    }
+  }
 
-    const output = await replicate.run("black-forest-labs/flux-3", { input });
+  try {
+    const replicate = new Replicate({ auth: token });
+    const output = await replicate.run(slug as `${string}/${string}`, { input });
     const videoUrl = extractUrl(output);
     if (!videoUrl) throw new Error("Could not extract a video URL from the Replicate response.");
-
     return NextResponse.json({ videoUrl, fallback: false });
   } catch (err: any) {
-    const reason = describeReplicateError(err, provider);
+    const reason = describeReplicateError(err, slug);
     console.error(`Replicate ${provider} video generation failed, using placeholder:`, reason, err);
     return placeholder(reason);
   }
 }
 
-function describeReplicateError(err: any, provider: string): string {
+function describeReplicateError(err: any, slug: string): string {
   if (err?.response) {
     const status = err.response.status;
     if (status === 401) return "Replicate rejected the API token (401 Unauthorized) — check REPLICATE_API_TOKEN.";
     if (status === 402) return "Replicate returned 402 Payment Required — billing/credits may need to be set up on your Replicate account.";
-    if (status === 404 && (provider === "seedance" || provider === "minimax")) {
-      const slug = provider === "seedance" ? SEEDANCE_MODEL_SLUG : MINIMAX_MODEL_SLUG;
-      const constName = provider === "seedance" ? "SEEDANCE_MODEL_SLUG" : "MINIMAX_MODEL_SLUG";
-      return `Replicate model not found (404) — the ${provider} model slug in app/api/generate-video/route.ts ("${slug}") is a best guess; check the exact "owner/model" string on Replicate's site and update lib/providerOptions.ts's ${constName}.`;
-    }
+    if (status === 404) return `Replicate model not found (404): "${slug}" is a best guess. Check the exact owner/model on replicate.com and update VIDEO_MODEL_SLUGS in lib/providerOptions.ts.`;
     if (status === 422) return `Replicate rejected the request (422): ${err.message}`;
     return `Replicate API error (status ${status}): ${err.message}`;
   }

@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { type NodeProps } from "@xyflow/react";
 import { ImagePlus, X, Upload } from "lucide-react";
 import { useFlowStore } from "@/lib/flowStore";
 import { fileToDownscaledDataUrl } from "@/lib/imageDownscale";
-import { IMAGE_HANDLE_CLASS } from "@/lib/handleIds";
+import TypedHandle from "../TypedHandle";
 import type { ReferenceNodeData } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import NodeShell from "./NodeShell";
@@ -48,7 +48,7 @@ export default function ReferenceNode({ id, data, selected }: NodeProps) {
       width="w-[220px]"
       showTarget={false}
       extraHandles={
-        <Handle type="source" position={Position.Right} className={IMAGE_HANDLE_CLASS} />
+        <TypedHandle nodeId={id} kind="image" type="source" top="50%" label="Image output" />
       }
     >
       <div

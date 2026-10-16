@@ -60,7 +60,6 @@ export default function StoryboardPage() {
                 <Link href={"/flow"} >
                     Generate with Flow
                 </Link>
-                
             </Button>
         </div>
         <div className="top-actions">

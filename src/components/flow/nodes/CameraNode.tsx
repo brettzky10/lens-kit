@@ -20,6 +20,8 @@ export default function CameraNode({ id, data, selected }: NodeProps) {
       title="Camera"
       selected={selected}
       width="w-[220px]"
+      targetKind="text"
+      sourceKind="text"
       onClick={() => openSetupPanel(id)}
     >
       <div className="flex items-center gap-3">

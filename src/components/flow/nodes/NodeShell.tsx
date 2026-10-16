@@ -5,6 +5,12 @@ import { Handle, Position } from "@xyflow/react";
 import { X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFlowStore } from "@/lib/flowStore";
+import {
+  isValidImageRefSource,
+  isValidPromptSource,
+  isValidVideoRefSource,
+} from "@/lib/connectionValidators";
+import TypedHandle, { type HandleKind } from "../TypedHandle";
 
 interface NodeShellProps {
   id: string;
@@ -13,12 +19,22 @@ interface NodeShellProps {
   accent?: string;
   showTarget?: boolean;
   showSource?: boolean;
+  /** Set to render the default input connector as a color-coded icon of this kind. Omit to keep the old dot. */
+  targetKind?: HandleKind;
+  /** Same, for the default output connector. */
+  sourceKind?: HandleKind;
   width?: string;
   children?: React.ReactNode;
   extraHandles?: React.ReactNode;
   onClick?: () => void;
   selected?: boolean;
 }
+
+const TARGET_VALIDATORS = {
+  text: isValidPromptSource,
+  image: isValidImageRefSource,
+  video: isValidVideoRefSource,
+} as const;
 
 export default function NodeShell({
   id,
@@ -27,6 +43,8 @@ export default function NodeShell({
   accent = "text-primary",
   showTarget = true,
   showSource = true,
+  targetKind,
+  sourceKind,
   width = "w-[280px]",
   children,
   extraHandles,
@@ -45,20 +63,25 @@ export default function NodeShell({
         onClick && "cursor-pointer"
       )}
     >
-      {showTarget && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="!bg-primary"
-        />
-      )}
-      {showSource && (
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="!bg-primary"
-        />
-      )}
+      {showTarget &&
+        (targetKind ? (
+          <TypedHandle
+            nodeId={id} kind={targetKind} type="target" top="50%"
+            label={`${targetKind[0].toUpperCase()}${targetKind.slice(1)} input`}
+            validate={TARGET_VALIDATORS[targetKind]}
+          />
+        ) : (
+          <Handle type="target" position={Position.Left} className="!bg-primary" />
+        ))}
+      {showSource &&
+        (sourceKind ? (
+          <TypedHandle
+            nodeId={id} kind={sourceKind} type="source" top="50%"
+            label={`${sourceKind[0].toUpperCase()}${sourceKind.slice(1)} output`}
+          />
+        ) : (
+          <Handle type="source" position={Position.Right} className="!bg-primary" />
+        ))}
       {extraHandles}
 
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">

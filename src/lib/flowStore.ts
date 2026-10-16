@@ -19,7 +19,14 @@ import {
   DEFAULT_VIDEO_RESOLUTION,
   DEFAULT_VIDEO_ASPECT_RATIO,
 } from "./videoOptions";
-import { DEFAULT_IMAGE_PROVIDER, DEFAULT_VIDEO_PROVIDER } from "./providerOptions";
+import { DEFAULT_IMAGE_PROVIDER, DEFAULT_IMAGE_NODE_PROVIDER, DEFAULT_VIDEO_PROVIDER } from "./providerOptions";
+import {
+  DEFAULT_IMAGE_ASPECT_BY_PROVIDER,
+  DEFAULT_IMAGE_RESOLUTION_BY_PROVIDER,
+  normalizeImageSettings,
+} from "./imageOptions";
+import { normalizeVideoSettings, VIDEO_SUPPORTS_AUDIO } from "./videoOptions";
+import { capsFor, pruneEdgesForCaps } from "./modelCapabilities";
 import { DEFAULT_CREATIVITY, DEFAULT_UPSCALE_FACTOR, DEFAULT_SAFETY_TOLERANCE } from "./upscaleOptions";
 
 type FlowNode = Node<AnyNodeData>;
@@ -37,6 +44,7 @@ interface FlowState {
   onConnect: (connection: Connection) => void;
   addNode: (type: FlowNodeType, position: { x: number; y: number }) => string;
   updateNodeData: (id: string, data: Partial<AnyNodeData>) => void;
+  setNodeProvider: (id: string, provider: string) => void;
   removeEdge: (id: string) => void;
   removeNode: (id: string) => void;
   exportFlow: () => string;
@@ -53,7 +61,15 @@ function defaultDataFor(type: FlowNodeType): AnyNodeData {
     case "lens":
       return { kind: "lens", lensId: "cooke-5i", focalLength: 35, aperture: "f/2.8" };
     case "image":
-      return { kind: "image", prompt: "", status: "idle", progress: 0, provider: DEFAULT_IMAGE_PROVIDER };
+      return {
+        kind: "image",
+        prompt: "",
+        status: "idle",
+        progress: 0,
+        provider: DEFAULT_IMAGE_NODE_PROVIDER,
+        aspectRatio: DEFAULT_IMAGE_ASPECT_BY_PROVIDER[DEFAULT_IMAGE_NODE_PROVIDER],
+        resolution: DEFAULT_IMAGE_RESOLUTION_BY_PROVIDER[DEFAULT_IMAGE_NODE_PROVIDER],
+      };
     case "video":
       return {
         kind: "video",
@@ -64,6 +80,8 @@ function defaultDataFor(type: FlowNodeType): AnyNodeData {
         resolution: DEFAULT_VIDEO_RESOLUTION,
         aspectRatio: DEFAULT_VIDEO_ASPECT_RATIO,
         provider: DEFAULT_VIDEO_PROVIDER,
+        audio: VIDEO_SUPPORTS_AUDIO[DEFAULT_VIDEO_PROVIDER] ? true : undefined,
+        draft: false,
       };
     case "character":
     case "object":
@@ -74,7 +92,9 @@ function defaultDataFor(type: FlowNodeType): AnyNodeData {
         progress: 0,
         sheetImage: undefined,
         outputPrompt: "",
-        provider: DEFAULT_IMAGE_PROVIDER,
+        provider: DEFAULT_IMAGE_NODE_PROVIDER,
+        aspectRatio: "16:9",
+        resolution: DEFAULT_IMAGE_RESOLUTION_BY_PROVIDER[DEFAULT_IMAGE_NODE_PROVIDER],
       };
     case "reference":
       return { kind: "reference" };
@@ -123,7 +143,15 @@ const initialNodes: FlowNode[] = [
     id: "image-1",
     type: "image",
     position: { x: 860, y: 200 },
-    data: { kind: "image", prompt: "", status: "idle", progress: 0, provider: DEFAULT_IMAGE_PROVIDER },
+    data: {
+      kind: "image",
+      prompt: "",
+      status: "idle",
+      progress: 0,
+      provider: DEFAULT_IMAGE_NODE_PROVIDER,
+      aspectRatio: DEFAULT_IMAGE_ASPECT_BY_PROVIDER[DEFAULT_IMAGE_NODE_PROVIDER],
+      resolution: DEFAULT_IMAGE_RESOLUTION_BY_PROVIDER[DEFAULT_IMAGE_NODE_PROVIDER],
+    },
   },
 ];
 
@@ -177,6 +205,25 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         n.id === id ? { ...n, data: { ...n.data, ...data } as AnyNodeData } : n
       ),
     }),
+
+  // Switch an Image/Video node's model: keep settings the new model supports, reset the rest,
+  // and remove connections the new model can't accept (e.g. a video reference on Veo).
+  setNodeProvider: (id, provider) => {
+    const node = get().nodes.find((n) => n.id === id);
+    if (!node) return;
+    const data = node.data as any;
+    if (!["image", "video", "character", "object", "location"].includes(data.kind)) return;
+    const settings =
+      data.kind === "video"
+        ? normalizeVideoSettings(provider as any, data)
+        : normalizeImageSettings(provider as any, data);
+    set({
+      nodes: get().nodes.map((n) =>
+        n.id === id ? ({ ...n, data: { ...n.data, provider, ...settings } } as FlowNode) : n
+      ),
+      edges: pruneEdgesForCaps(id, capsFor(data.kind === "video" ? "video" : "image", provider), get().edges),
+    });
+  },
 
   removeEdge: (id) =>
     set({ edges: get().edges.filter((e) => e.id !== id) }),

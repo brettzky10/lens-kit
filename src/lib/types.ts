@@ -1,3 +1,5 @@
+import type { ImageModelProvider, VideoGenerationProvider } from "./providerOptions";
+
 export type FlowNodeType =
   | "prompt"
   | "camera"
@@ -51,7 +53,10 @@ export interface ImageNodeData {
   status: "idle" | "loading" | "done" | "error";
   progress: number;
   imageUrl?: string;
-  provider: "flux" | "local";
+  provider: ImageModelProvider;
+  aspectRatio?: string;
+  resolution?: string;
+  fallbackNotice?: string | null;
 }
 
 export interface VideoNodeData {
@@ -64,7 +69,10 @@ export interface VideoNodeData {
   duration: string;
   resolution: string;
   aspectRatio: string;
-  provider: "flux" | "seedance" | "minimax" | "local";
+  provider: VideoGenerationProvider;
+  audio?: boolean;
+  draft?: boolean;
+  fallbackNotice?: string | null;
 }
 
 /** Shared data shape for Character / Object / Location "sheet" nodes. */
@@ -80,7 +88,11 @@ export interface SheetNodeData {
   // The reusable description output via the sheet-prompt-out handle to
   // downstream Image/Video/Sheet nodes.
   outputPrompt: string;
-  provider: "flux" | "local";
+  // sheets are image generations (one 16:9 image, three cards), so they use the image models
+  provider: ImageModelProvider;
+  aspectRatio?: string;
+  resolution?: string;
+  fallbackNotice?: string | null;
 }
 
 /** A user-provided reference image dropped directly into the canvas. */
@@ -111,6 +123,7 @@ export interface UpscaleNodeData {
   upscaleFactor: number;
   safetyTolerance: number;
   provider: "flux" | "local";
+  fallbackNotice?: string | null;
 }
 
 /** Applies a color-grading "look" (LUT-style) to a connected image, entirely client-side. */
@@ -146,15 +159,15 @@ export const NODE_TYPE_META: Record<
   video: { label: "Video", description: "Generate a video from image refs" },
   character: {
     label: "Character",
-    description: "One consistent character sheet (facial/frontal/back) + reusable prompt",
+    description: "One 16:9 image: face, full body front, full body back",
   },
   object: {
-    label: "Object",
-    description: "One consistent object sheet (side/front/back) + reusable prompt",
+    label: "Prop",
+    description: "One 16:9 image, three angles of the same prop (front, perspective, other angle)",
   },
   location: {
     label: "Location",
-    description: "One consistent location sheet (3 views) + reusable prompt",
+    description: "One 16:9 image: three views of the same location, turning in a circle",
   },
   reference: {
     label: "Reference",
@@ -175,3 +188,67 @@ export const NODE_TYPE_META: Record<
 };
 
 
+//SHOT
+export type Vec3 = [number, number, number];
+
+export type SubjectType = "person" | "car" | "house";
+
+export interface ShotCamera {
+  position: Vec3;
+  target: Vec3;
+  fov: number;
+  roll: number;
+}
+
+export interface ShotSubject {
+  type: SubjectType;
+  position: Vec3;
+  rotation: Vec3;
+  scale: number;
+}
+
+/** The portable "Shot JSON" — enough to reproduce a shot exactly. */
+export interface Shot {
+  camera: ShotCamera;
+  subject: ShotSubject;
+}
+
+export interface SavedShot {
+  id: string;
+  name: string;
+  createdAt: number;
+  shot: Shot;
+}
+
+/** The live rig state driving the scene — spherical, not cartesian. */
+export interface RigState {
+  azimuth: number; // degrees, 0 = camera in front of subject's facing direction
+  elevation: number; // degrees, camera above (+) / below (-) subject's horizontal plane
+  distance: number; // meters, camera-to-target distance
+  fov: number; // degrees, vertical FOV
+  roll: number; // degrees, camera roll around its view axis
+  targetHeight: number; // meters, height of the look-at point above subject base
+  subjectType: SubjectType;
+  subjectRotationY: number; // degrees, subject yaw
+  subjectScale: number;
+}
+
+export interface ShotAnalysis {
+  distance: number;
+  azimuthRelative: number; // -180..180, 0 = front, sign: + left, - right
+  elevation: number;
+  verticalTilt: number;
+  fov: number;
+  roll: number;
+  perspectiveStrength: number; // 0-100
+  perspectiveLabel: string;
+  screenX: number; // -1..1 NDC
+  screenY: number; // -1..1 NDC
+  screenPositionLabel: string;
+  subjectAngularSizeDeg: number;
+  frameFraction: number; // 0..1+, fraction of vertical FOV the subject occupies
+  framingLabel: string;
+  aboveBelowLabel: "above" | "below" | "eye-level";
+  sideLabel: "left" | "right" | "center";
+  relationshipLabel: string; // front / 3/4 front / side / 3/4 rear / rear
+}

@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   ReactFlow,
+  ConnectionMode,
   Background,
   Controls,
   MiniMap,
@@ -12,6 +13,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { useFlowStore } from "@/lib/flowStore";
+import { isValidFlowConnection } from "@/lib/flowConnections";
 import type { FlowNodeType } from "@/lib/types";
 
 import PromptNode from "./nodes/PromptNode";
@@ -38,10 +40,12 @@ const nodeTypes = {
   character: SheetNode,
   object: SheetNode,
   location: SheetNode,
+  costume: SheetNode,
   reference: ReferenceNode,
   shot: ShotNode,
-  lut: LutNode,
   upscale: UpscaleNode,
+  lut: LutNode,
+
 };
 
 const edgeTypes = {
@@ -80,6 +84,11 @@ export default function FlowCanvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        connectionMode={ConnectionMode.Strict} // output -> input only
+        isValidConnection={(c) => {
+          const { nodes: n, edges: e } = useFlowStore.getState();
+          return isValidFlowConnection(c, n as any, e);
+        }}
         onInit={setRfInstance}
         onPaneContextMenu={onPaneContextMenu}
         nodeTypes={nodeTypes}

@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { type NodeProps } from "@xyflow/react";
 import { Clapperboard, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useFlowStore } from "@/lib/flowStore";
 import { SHOTS } from "@/lib/shotsData";
-import { SHOT_PROMPT_OUT_ID, SHOT_VIDEO_OUT_ID, PROMPT_HANDLE_CLASS, VIDEO_REF_HANDLE_CLASS } from "@/lib/handleIds";
+import { SHOT_PROMPT_OUT_ID, SHOT_VIDEO_OUT_ID } from "@/lib/handleIds";
+import TypedHandle from "../TypedHandle";
 import type { ShotNodeData } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import NodeShell from "./NodeShell";
@@ -119,20 +120,8 @@ export default function ShotNode({ id, data, selected }: NodeProps) {
       showSource={false}
       extraHandles={
         <>
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={SHOT_VIDEO_OUT_ID}
-            style={{ top: "35%" }}
-            className={VIDEO_REF_HANDLE_CLASS}
-          />
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={SHOT_PROMPT_OUT_ID}
-            style={{ top: "65%" }}
-            className={PROMPT_HANDLE_CLASS}
-          />
+          <TypedHandle nodeId={id} kind="video" type="source" id={SHOT_VIDEO_OUT_ID} top="35%" label="Shot video" />
+          <TypedHandle nodeId={id} kind="text" type="source" id={SHOT_PROMPT_OUT_ID} top="65%" label="Shot prompt" />
         </>
       }
     >

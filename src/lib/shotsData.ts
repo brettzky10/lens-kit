@@ -57,4 +57,12 @@ export const SHOTS: ShotDefinition[] = [
     prompt:
       "Camera: vehicle tracking shot. Movement: move with the vehicle along its route. Speed: match the vehicle's pace. Framing: keep the vehicle stable in frame while the road or environment moves past. End: maintain a clear moving vehicle composition.",
   },
+  {
+    id: "Vehicle-chase",
+    name: "Vehicle-chase",
+    category: "aerial",
+    videoUrl: "/shots/car-chase.mp4",
+    prompt:
+      "Camera: vehicle tracking shot. Movement: move with the vehicle along its route and have the camera chase down and catch up to the fast vehicle. Speed: match the vehicle's pace. Framing: keep the vehicle stable in frame and chaser down the car with an aerial shot. End: maintain a clear moving vehicle composition.",
+  },
 ];

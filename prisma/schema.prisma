@@ -24,6 +24,13 @@ enum Plan {
   ULTIMATE
 }
 
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  INCOMPLETE
+}
+
 model User {
   // Set explicitly to the Supabase auth user's UUID when a User row is
   // first created (see lib/creditGuard.ts) rather than relying on the
@@ -37,9 +44,20 @@ model User {
   role          Role      @default(USER)
   isPremium     Boolean   @default(false)
   credits       Int       @default(0)
+  // Total credits available this cycle: the balance right after the last
+  // monthly grant plus any top-up packs bought since. The progress ring shows
+  // used = creditsCycleTotal - credits, as a share of this.
+  creditsCycleTotal Int       @default(0)
+  // When the free STANDARD plan's next monthly grant is due (granted lazily,
+  // see lib/credits.ts — no cron needed).
+  nextFreeGrantAt   DateTime  @default(now())
+  // Denormalized copy of the active subscription's plan (STANDARD = none),
+  // kept in sync by the Stripe webhook handler for convenient reads
+  // without joining Subscription.
   plan          Plan      @default(STANDARD)
-  stripeId      String? // Customer ID for billing portal
+  stripeId      String? // Stripe Customer ID
   payments      Payment[]
+  subscriptions Subscription[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -53,6 +71,39 @@ model Payment {
   stripePaymentId String   @unique
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Subscription {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  plan   Plan               @default(PRO) // PRO or ULTIMATE — never STANDARD here
+  status SubscriptionStatus @default(ACTIVE)
+
+  stripeCustomerId     String
+  stripeSubscriptionId String  @unique
+  stripePriceId        String
+
+  // When this subscription began, and — once it has actually ended or a
+  // cancellation has been scheduled — when it ends/ended. Null while
+  // active with no cancellation scheduled.
+  startDate DateTime
+  endDate   DateTime?
+
+  // The current Stripe billing period's end — used to display "renews on"
+  // / "access until", and to know when the next credit grant is due.
+  currentPeriodEnd DateTime
+  cancelAtPeriodEnd Boolean @default(false)
+
+  // The last invoice.id we already granted monthly credits for, so a
+  // duplicate/retried webhook delivery can't double-grant credits.
+  lastCreditedInvoiceId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
 }

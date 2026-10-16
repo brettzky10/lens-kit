@@ -2,211 +2,92 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Handle, Position, type NodeProps, type Connection, type Edge } from "@xyflow/react";
-import { ImageIcon, Sparkles, Download } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { type NodeProps } from "@xyflow/react";
+import { ImageIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useFlowStore } from "@/lib/flowStore";
 import { composeUpstreamPrompt, collectUpstreamImageRefs } from "@/lib/promptGraph";
-import {
-  PROMPT_HANDLE_ID,
-  IMAGE_REFS_HANDLE_ID,
-  PROMPT_HANDLE_CLASS,
-  IMAGE_HANDLE_CLASS,
-} from "@/lib/handleIds";
-import { isValidPromptSource, isValidImageRefSource } from "@/lib/connectionValidators";
-import { IMAGE_PROVIDERS } from "@/lib/providerOptions";
-import { downloadUrl } from "@/lib/downloadFile";
+import { IMAGE_REFS_HANDLE_ID, PROMPT_HANDLE_ID } from "@/lib/handleIds";
+import { isValidImageRefSource, isValidPromptSource } from "@/lib/connectionValidators";
+import { IMAGE_NODE_MODELS } from "@/lib/providerOptions";
+import { capsFor } from "@/lib/modelCapabilities";
+import { aspectToCss } from "@/lib/imageOptions";
 import { useHandleSync } from "@/lib/useHandleSync";
 import type { ImageNodeData } from "@/lib/types";
-import NodeShell from "./NodeShell";
-import PromptPreview from "./PromptPreview";
+import GenNodeFrame from "../GenNodeFrame";
+import NodeModelToolbar from "../NodeModelToolbar";
+import RunMenu from "../RunMenu";
+import TypedHandle from "../TypedHandle";
+
+const H0 = 44; // first connector, px from top
+const GAP = 44;
 
 export default function ImageNode({ id, data, selected }: NodeProps) {
-  const imgData = data as ImageNodeData;
-  const updateNodeData = useFlowStore((s) => s.updateNodeData);
+  const d = data as ImageNodeData;
   const nodes = useFlowStore((s) => s.nodes);
   const edges = useFlowStore((s) => s.edges);
-  const [fallbackNotice, setFallbackNotice] = React.useState<string | null>(null);
-  const [downloading, setDownloading] = React.useState(false);
 
-  // Only follows edges wired into the "prompt" connector (Prompt / Camera /
-  // Lens / Character / Object / Location nodes) — ignores anything wired
-  // into the separate image-refs connector, same handle-scoped traversal
-  // as the Video node.
-  const composedPrompt = React.useMemo(
-    () => composeUpstreamPrompt(id, nodes as any, edges, PROMPT_HANDLE_ID),
-    [id, nodes, edges]
-  );
+  const prompt = React.useMemo(() => composeUpstreamPrompt(id, nodes as any, edges, PROMPT_HANDLE_ID), [id, nodes, edges]);
+  const imageRefs = React.useMemo(() => collectUpstreamImageRefs(id, nodes as any, edges, IMAGE_REFS_HANDLE_ID), [id, nodes, edges]);
 
-  // Only follows edges wired into the "image refs" connector (Image /
-  // Reference / Character / Object / Location nodes).
-  const imageRefs = React.useMemo(
-    () => collectUpstreamImageRefs(id, nodes as any, edges, IMAGE_REFS_HANDLE_ID),
-    [id, nodes, edges]
-  );
+  const caps = capsFor("image", d.provider);
+  const modelLabel = IMAGE_NODE_MODELS.find((m) => m.value === d.provider)?.label ?? d.provider;
+  const loading = d.status === "loading";
 
-  const promptValidator = React.useCallback(
-    (connection: Connection | Edge) => isValidPromptSource(connection, nodes as any),
-    [nodes]
-  );
-
-  const imageRefValidator = React.useCallback(
-    (connection: Connection | Edge) => isValidImageRefSource(connection, nodes as any),
-    [nodes]
-  );
-
-  useHandleSync(id, [id, imageRefs.length, fallbackNotice, imgData.status]);
-
-  async function handleGenerate() {
-    setFallbackNotice(null);
-    updateNodeData(id, { status: "loading", progress: 0, prompt: composedPrompt });
-
-    const interval = setInterval(() => {
-      updateNodeData(id, {
-        progress: Math.min(
-          95,
-          (((useFlowStore.getState().nodes.find((n) => n.id === id)?.data as ImageNodeData)
-            ?.progress ?? 0) + Math.random() * 18)
-        ),
-      });
-    }, 350);
-
-    try {
-      const res = await fetch("/api/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: composedPrompt, imageRefs, provider: imgData.provider }),
-      });
-      const json = await res.json();
-      clearInterval(interval);
-      if (json.fallback) setFallbackNotice(json.fallbackReason ?? "Using placeholder image.");
-      updateNodeData(id, { status: "done", progress: 100, imageUrl: json.imageUrl });
-    } catch (err) {
-      clearInterval(interval);
-      updateNodeData(id, { status: "error", progress: 0 });
-    }
-  }
-
-  async function handleDownload() {
-    if (!imgData.imageUrl) return;
-    setDownloading(true);
-    const ext = imgData.imageUrl.includes(".png") ? "png" : imgData.imageUrl.includes(".webp") ? "webp" : "jpg";
-    await downloadUrl(imgData.imageUrl, `cineflow-image-${id}.${ext}`);
-    setDownloading(false);
-  }
+  // connectors appear/disappear with the model, so React Flow must re-measure them
+  useHandleSync(id, [id, d.provider, caps.imageRefs, d.aspectRatio, d.status]);
 
   return (
-    <NodeShell
-      id={id}
-      icon={ImageIcon}
-      title="Image"
-      selected={selected}
-      width="w-[300px]"
-      showTarget={false}
-      extraHandles={
+    <GenNodeFrame
+      icon={ImageIcon} title="Image" modelLabel={modelLabel} selected={selected}
+      handles={
         <>
-          <Handle
-            type="target"
-            position={Position.Left}
-            id={PROMPT_HANDLE_ID}
-            isValidConnection={promptValidator}
-            style={{ top: "38%" }}
-            className={PROMPT_HANDLE_CLASS}
-          />
-          <Handle
-            type="target"
-            position={Position.Left}
-            id={IMAGE_REFS_HANDLE_ID}
-            isValidConnection={imageRefValidator}
-            style={{ top: "68%" }}
-            className={IMAGE_HANDLE_CLASS}
-          />
+          <TypedHandle nodeId={id} kind="text" type="target" id={PROMPT_HANDLE_ID} top={H0} label="Prompt" validate={isValidPromptSource} />
+          {caps.imageRefs > 0 && (
+            <TypedHandle nodeId={id} kind="image" type="target" id={IMAGE_REFS_HANDLE_ID} top={H0 + GAP} label={caps.imageLabel} validate={isValidImageRefSource} />
+          )}
+          <TypedHandle nodeId={id} kind="image" type="source" top={H0} label="Image output" />
         </>
       }
+      toolbar={<NodeModelToolbar id={id} kind="image" data={d} />}
     >
-      <div className="nodrag mb-2">
-        <div className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Model
-        </div>
-        <Select
-          value={imgData.provider}
-          onValueChange={(v) => updateNodeData(id, { provider: v as ImageNodeData["provider"] })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {IMAGE_PROVIDERS.map((p) => (
-              <SelectItem key={p.value} value={p.value}>
-                {p.label}
-              </SelectItem>
+      <div className="relative flex w-full items-center justify-center bg-secondary/60" style={{ aspectRatio: aspectToCss(d.aspectRatio) }}>
+        {loading && (
+          <>
+            <Skeleton className="absolute inset-0 rounded-none" />
+            <span className="relative z-10 text-sm font-medium">{Math.round(d.progress)}%</span>
+          </>
+        )}
+        {d.status === "done" && d.imageUrl && <Image src={d.imageUrl} alt="Generated" fill className="object-cover" unoptimized />}
+        {d.status === "idle" && <ImageIcon className="h-8 w-8 text-muted-foreground/50" />}
+        {d.status === "error" && <span className="px-4 text-center text-xs text-destructive">Generation failed. Check the prompt connector and try again.</span>}
+
+        {imageRefs.length > 0 && (
+          <div className="absolute bottom-2 left-2 z-10 flex gap-1.5">
+            {imageRefs.slice(0, 3).map((url, i) => (
+              <div key={i} className="relative h-9 w-9 overflow-hidden rounded-lg border-2 border-card shadow">
+                <Image src={url} alt={`reference ${i + 1}`} fill className="object-cover" unoptimized />
+              </div>
             ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <PromptPreview
-        prompt={composedPrompt}
-        placeholder="Connect a Prompt node (and optionally Camera / Lens nodes) to the top-left connector to build this shot..."
-      />
-
-      {imageRefs.length > 0 && (
-        <div className="mb-2 flex gap-1.5">
-          {imageRefs.map((url, i) => (
-            <div key={i} className="relative h-8 w-12 overflow-hidden rounded border border-border">
-              <Image src={url} alt={`ref ${i}`} fill className="object-cover" unoptimized />
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="group/img relative mb-2 flex h-[168px] w-full items-center justify-center overflow-hidden rounded-md bg-secondary/60">
-        {imgData.status === "loading" && (
-          <>
-            <Skeleton className="absolute inset-0 rounded-md" />
-            <span className="relative z-10 text-xs font-medium text-foreground">
-              {Math.round(imgData.progress)}%
-            </span>
-          </>
-        )}
-        {imgData.status === "done" && imgData.imageUrl && (
-          <>
-            <Image src={imgData.imageUrl} alt="Generated" fill className="object-cover" unoptimized />
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              title="Download image"
-              className="nodrag absolute bottom-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity hover:bg-black/80 group-hover/img:opacity-100"
-            >
-              <Download className="h-3.5 w-3.5" />
-            </button>
-          </>
-        )}
-        {imgData.status === "idle" && (
-          <span className="text-[11px] text-muted-foreground">Your generation will appear here</span>
-        )}
-        {imgData.status === "error" && (
-          <span className="text-[11px] text-destructive">Generation failed — try again</span>
+            {imageRefs.length > 3 && (
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-card bg-background/80 text-xs">+{imageRefs.length - 3}</div>
+            )}
+          </div>
         )}
       </div>
 
-      {fallbackNotice && (
-        <div className="mb-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-[10px] leading-relaxed text-amber-400">
-          <span className="font-semibold">Placeholder image — model wasn&apos;t used:</span> {fallbackNotice}
+      {d.fallbackNotice && (
+        <div className="mx-4 mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] leading-relaxed text-amber-400">
+          <span className="font-semibold">Placeholder image, model wasn&apos;t used:</span> {d.fallbackNotice}
         </div>
       )}
 
-      <Button
-        size="sm"
-        className="nodrag w-full"
-        disabled={imgData.status === "loading" || !composedPrompt}
-        onClick={handleGenerate}
-      >
-        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-        {imgData.status === "loading" ? "Generating..." : "Generate image"}
-      </Button>
-    </NodeShell>
+      <div className="flex items-end gap-3 p-4">
+        <p className="nowheel line-clamp-3 min-h-10 flex-1 text-[15px] leading-snug">
+          {prompt || <span className="text-muted-foreground">Connect a Prompt node to the text connector…</span>}
+        </p>
+        <RunMenu nodeId={id} busy={loading} />
+      </div>
+    </GenNodeFrame>
   );
 }

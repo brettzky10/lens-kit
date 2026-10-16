@@ -1,0 +1,160 @@
+:root {
+  --bg: #0c0e12;
+  --bg-raised: #14171d;
+  --paper: #f4ecdd;
+  --ink: #ece7dd;
+  --ink-dim: #9a9d9f;
+  --line: #2a2d33;
+  --teal: #67d8c4;
+  --teal-dim: #3f7d72;
+  --amber: #e8a33d;
+  --rose: #c9564f;
+  --radius: 10px;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f6f3ec; --bg-raised: #ffffff; --paper: #ffffff;
+    --ink: #1b1d21; --ink-dim: #6b6e72; --line: #ddd6c8;
+    --teal-dim: #bfe9e0;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f6f3ec; --bg-raised: #ffffff; --paper: #ffffff;
+  --ink: #1b1d21; --ink-dim: #6b6e72; --line: #ddd6c8;
+  --teal-dim: #bfe9e0;
+}
+.scenecraft * { box-sizing: border-box; }
+.scenecraft {
+  background: var(--bg); color: var(--ink);
+  font-family: 'Inter', -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+html { scroll-behavior: smooth; scroll-padding-top: calc(72px + env(safe-area-inset-top, 0px)); }
+.scenecraft h1, .scenecraft h2, .scenecraft h3, .scenecraft .display {
+  font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-spacing: -0.01em;
+}
+.scenecraft a { color: inherit; }
+.scenecraft .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+.scenecraft img, .scenecraft svg { max-width: 100%; }
+
+/* film-leader rule along the very top */
+.scenecraft .leader {
+  height: 6px; width: 100%;
+  background-image: repeating-linear-gradient(90deg, var(--line) 0 3px, transparent 3px 22px);
+  opacity: .8;
+}
+
+.scenecraft header {
+  position: sticky; top: 0; z-index: 20;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.scenecraft nav.wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.scenecraft .logo { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 500; }
+.scenecraft .logo .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rose); box-shadow: 0 0 8px var(--rose); }
+.scenecraft .navlinks { display: flex; gap: 28px; font-size: 14px; color: var(--ink-dim); }
+.scenecraft .navlinks a:hover { color: var(--ink); }
+.scenecraft .btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 18px; border-radius: 999px; font-size: 14px; font-weight: 600;
+  text-decoration: none; border: 1px solid transparent; cursor: pointer;
+  transition: transform .15s ease, background .15s ease;
+}
+.scenecraft .btn-primary { background: var(--teal); color: #08211d; }
+.scenecraft .btn-primary:hover { transform: translateY(-1px); background: #7ee3d0; }
+.scenecraft .btn-ghost { border-color: var(--line); color: var(--ink); }
+.scenecraft .btn-ghost:hover { border-color: var(--ink-dim); }
+
+/* ---------- Hero ---------- */
+.scenecraft .hero { padding: 72px 0 96px; }
+.scenecraft .hero-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 56px; align-items: center; }
+.scenecraft .hero h1 { font-size: clamp(34px, 5vw, 54px); line-height: 1.08; margin: 0 0 22px; }
+.scenecraft .hero p.lede { font-size: 17px; line-height: 1.6; color: var(--ink-dim); max-width: 46ch; margin: 0 0 32px; }
+.scenecraft .hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; }
+
+/* viewfinder graphic */
+.scenecraft .viewfinder {
+  position: relative; aspect-ratio: 16/10; border-radius: var(--radius);
+  background: radial-gradient(120% 140% at 30% 20%, #1c2b29 0%, #0a0d10 70%);
+  border: 1px solid var(--line); overflow: hidden;
+}
+.scenecraft .viewfinder svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.scenecraft .viewfinder .tag {
+  position: absolute; left: 14px; top: 12px; font-size: 11px; color: var(--teal);
+  display: flex; align-items: center; gap: 6px;
+}
+.scenecraft .viewfinder .tag .rec { width: 6px; height: 6px; border-radius: 50%; background: var(--rose); }
+.scenecraft .viewfinder .meta { position: absolute; right: 14px; bottom: 12px; font-size: 11px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+
+/* ---------- Tool bands ---------- */
+.scenecraft .band { padding: 88px 0; border-top: 1px solid var(--line); }
+.scenecraft .band-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.scenecraft .band-grid.flip .art { order: 2; }
+.scenecraft .band .kicker { color: var(--ink-dim); font-size: 14px; margin: 0 0 10px; }
+.scenecraft .band h2 { font-size: clamp(26px, 3.4vw, 36px); margin: 0 0 16px; max-width: 16ch; }
+.scenecraft .band p { font-size: 16px; line-height: 1.65; color: var(--ink-dim); max-width: 46ch; margin: 0 0 20px; }
+.scenecraft .band ul { list-style: none; padding: 0; margin: 0 0 20px; font-size: 14.5px; color: var(--ink); }
+.scenecraft .band li { padding: 7px 0; border-top: 1px solid var(--line); display: flex; gap: 10px; }
+.scenecraft .band li:first-child { border-top: none; }
+.scenecraft .swatch { width: 6px; border-radius: 3px; flex-shrink: 0; }
+.scenecraft .band .open-link { font-size: 14px; font-weight: 600; color: var(--teal); text-decoration: none; }
+.scenecraft .band .open-link:hover { text-decoration: underline; }
+
+/* storyboard art: stacked cards on paper */
+.scenecraft .board-stack { position: relative; height: 300px; }
+.scenecraft .card {
+  position: absolute; width: 78%; aspect-ratio: 4/3; background: var(--paper); border-radius: 6px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.35); border: 1px solid rgba(0,0,0,.08);
+  color: #1b1d21; padding: 12px;
+}
+.scenecraft .card .frame-no { font-size: 10px; color: #8a8478; font-variant-numeric: tabular-nums; }
+.scenecraft .card .sketch { width: 100%; height: 66%; margin-top: 8px; border-radius: 3px; }
+.scenecraft .card .cap { font-size: 10.5px; color: #4a463d; margin-top: 6px; line-height: 1.4; }
+.scenecraft .card.c1 { left: 0; top: 0; transform: rotate(-4deg); z-index: 1; }
+.scenecraft .card.c2 { left: 14%; top: 24px; transform: rotate(2deg); z-index: 2; }
+.scenecraft .card.c3 { left: 22%; top: 56px; transform: rotate(-1deg); z-index: 3; }
+
+/* node graph art */
+.scenecraft .node { fill: var(--bg-raised); stroke: var(--line); }
+.scenecraft .node-title { fill: var(--ink); font-size: 9px; font-family: 'Inter', sans-serif; }
+.scenecraft .node-port { fill: var(--teal); }
+.scenecraft .edge { stroke: var(--teal); stroke-width: 1.4; fill: none; opacity: .7; }
+
+/* ---------- process strip ---------- */
+.scenecraft .process { padding: 88px 0; border-top: 1px solid var(--line); }
+.scenecraft .process h2 { font-size: clamp(24px, 3vw, 32px); margin: 0 0 48px; max-width: 20ch; }
+.scenecraft .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; position: relative; }
+.scenecraft .steps::before {
+  content: ""; position: absolute; top: 17px; left: 6%; right: 6%; height: 1px;
+  background: repeating-linear-gradient(90deg, var(--line) 0 8px, transparent 8px 14px);
+}
+.scenecraft .step { padding-right: 20px; }
+.scenecraft .step .n {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--bg-raised); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--teal);
+  position: relative; z-index: 1; margin-bottom: 18px; font-variant-numeric: tabular-nums;
+}
+.scenecraft .step h3 { font-size: 16px; margin: 0 0 8px; font-family: 'Inter', sans-serif; font-weight: 600; }
+.scenecraft .step p { font-size: 13.5px; color: var(--ink-dim); line-height: 1.55; margin: 0; }
+
+/* ---------- final cta ---------- */
+.scenecraft .final { padding: 100px 0 120px; text-align: center; border-top: 1px solid var(--line); }
+.scenecraft .final h2 { font-size: clamp(30px, 4.5vw, 46px); max-width: 18ch; margin: 0 auto 28px; }
+.scenecraft .final .btn-primary { padding: 14px 26px; font-size: 15px; }
+
+.scenecraft footer { border-top: 1px solid var(--line); padding: 28px 0; }
+.scenecraft footer .wrap { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--ink-dim); }
+.scenecraft footer .navlinks { font-size: 13px; }
+
+@media (max-width: 860px) {
+  .scenecraft .hero-grid, .scenecraft .band-grid { grid-template-columns: 1fr; }
+  .scenecraft .band-grid.flip .art { order: 0; }
+  .scenecraft .steps { grid-template-columns: 1fr 1fr; row-gap: 32px; }
+  .scenecraft .steps::before { display: none; }
+  .scenecraft .navlinks { display: none; }
+}

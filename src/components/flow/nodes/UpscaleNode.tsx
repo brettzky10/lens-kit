@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Handle, Position, type NodeProps, type Connection, type Edge } from "@xyflow/react";
+import { type NodeProps } from "@xyflow/react";
 import { ArrowUpCircle, Sparkles, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useFlowStore } from "@/lib/flowStore";
 import { collectUpstreamVideoRefs } from "@/lib/promptGraph";
-import { VIDEO_REF_HANDLE_ID, VIDEO_REF_HANDLE_CLASS } from "@/lib/handleIds";
+import { VIDEO_REF_HANDLE_ID } from "@/lib/handleIds";
+import { runUpscaleNode } from "@/lib/runner";
+import TypedHandle from "../TypedHandle";
 import { isValidVideoRefSource } from "@/lib/connectionValidators";
 import { UPSCALE_PROVIDERS } from "@/lib/providerOptions";
 import { DEFAULT_IMAGE_PROVIDER } from "@/lib/providerOptions";
@@ -54,11 +56,12 @@ export default function UpscaleNode({ id, data, selected }: NodeProps) {
     upscaleFactor: rawData?.upscaleFactor ?? DEFAULT_UPSCALE_FACTOR,
     safetyTolerance: rawData?.safetyTolerance ?? DEFAULT_SAFETY_TOLERANCE,
     provider: rawData?.provider ?? DEFAULT_IMAGE_PROVIDER,
+    fallbackNotice: rawData?.fallbackNotice ?? null,
   };
   const updateNodeData = useFlowStore((s) => s.updateNodeData);
   const nodes = useFlowStore((s) => s.nodes);
   const edges = useFlowStore((s) => s.edges);
-  const [fallbackNotice, setFallbackNotice] = React.useState<string | null>(null);
+  const fallbackNotice = upData.fallbackNotice ?? null;
   const [downloading, setDownloading] = React.useState(false);
 
   const [localPrompt, setLocalPrompt] = React.useState(upData.prompt);
@@ -69,11 +72,6 @@ export default function UpscaleNode({ id, data, selected }: NodeProps) {
     [id, nodes, edges]
   );
 
-  const videoRefValidator = React.useCallback(
-    (connection: Connection | Edge) => isValidVideoRefSource(connection, nodes as any),
-    [nodes]
-  );
-
   useHandleSync(id, [id, !!inputVideo, fallbackNotice, upData.status]);
 
   function handlePromptChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -82,43 +80,8 @@ export default function UpscaleNode({ id, data, selected }: NodeProps) {
     updateNodeData(id, { prompt: value });
   }
 
-  async function handleUpscale() {
-    if (!inputVideo) return;
-    setFallbackNotice(null);
-    updateNodeData(id, { status: "loading", progress: 0 });
-
-    const interval = setInterval(() => {
-      updateNodeData(id, {
-        progress: Math.min(
-          95,
-          (((useFlowStore.getState().nodes.find((n) => n.id === id)?.data as UpscaleNodeData)
-            ?.progress ?? 0) + Math.random() * 10)
-        ),
-      });
-    }, 450);
-
-    try {
-      const res = await fetch("/api/upscale-video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inputVideo,
-          prompt: upData.prompt,
-          creativity: upData.creativity,
-          upscaleFactor: upData.upscaleFactor,
-          safetyTolerance: upData.safetyTolerance,
-          provider: upData.provider,
-        }),
-      });
-      const json = await res.json();
-      clearInterval(interval);
-      if (json.fallback) setFallbackNotice(json.fallbackReason ?? "Returned the original video, unscaled.");
-      updateNodeData(id, { status: "done", progress: 100, videoUrl: json.videoUrl });
-    } catch (err) {
-      clearInterval(interval);
-      updateNodeData(id, { status: "error", progress: 0 });
-    }
-  }
+  // runs through the shared runner so "Run from here / till here" can trigger it too
+  const handleUpscale = () => runUpscaleNode(id);
 
   async function handleDownload() {
     if (!upData.videoUrl) return;
@@ -137,12 +100,14 @@ export default function UpscaleNode({ id, data, selected }: NodeProps) {
       showTarget={false}
       showSource={false}
       extraHandles={
-        <Handle
+        <TypedHandle
+          nodeId={id}
+          kind="video"
           type="target"
-          position={Position.Left}
           id={VIDEO_REF_HANDLE_ID}
-          isValidConnection={videoRefValidator}
-          className={VIDEO_REF_HANDLE_CLASS}
+          top="50%"
+          label="Video to upscale"
+          validate={isValidVideoRefSource}
         />
       }
     >
