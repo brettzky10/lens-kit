@@ -1,9 +1,10 @@
+// app/api/billing/change-plan/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
-import { PLAN_CONFIGS, PLAN_RANK, isPaidPlan, maxCarry } from "@/lib/actions/plans";
+import { PLAN_CONFIGS, PLAN_RANK, isPaidPlan, maxCarry } from "@/lib/plans";
 import { addTopUpCredits } from "@/lib/actions/credits";
 import { getPeriodEnd, getPeriodStart } from "@/lib/actions/billing";
 
