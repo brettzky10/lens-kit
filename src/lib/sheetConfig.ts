@@ -8,6 +8,8 @@ export interface SheetConfig {
   placeholder: string;
   /** panel-by-panel instructions that go into the generation prompt */
   layout: string;
+  /** aspect ratio of the generated sheet, passed to the image model */
+  aspectRatio: string;
 }
 
 export const SHEET_CONFIGS: Record<SheetKind, SheetConfig> = {
@@ -16,6 +18,7 @@ export const SHEET_CONFIGS: Record<SheetKind, SheetConfig> = {
     subjectNoun: "character",
     views: ["Face", "Full body front", "Full body back"],
     placeholder: "Connect a Prompt node to describe this character…",
+    aspectRatio: "16:9",
     layout:
       "Panel 1 (left): a close-up portrait of the character's face, head and shoulders, looking at the camera. " +
       "Panel 2 (middle): the full body seen from the front, head to toe, standing in a relaxed neutral pose. " +
@@ -27,6 +30,7 @@ export const SHEET_CONFIGS: Record<SheetKind, SheetConfig> = {
     subjectNoun: "prop",
     views: ["Front, full", "Perspective", "Other angle"],
     placeholder: "Connect a Prompt node to describe this prop…",
+    aspectRatio: "16:9",
     layout:
       "Panel 1 (left): the entire prop seen straight from the front, fully in frame and centered. " +
       "Panel 2 (middle): a three-quarter perspective view of the prop from slightly above, as if walking around it. " +
@@ -38,6 +42,7 @@ export const SHEET_CONFIGS: Record<SheetKind, SheetConfig> = {
     subjectNoun: "location",
     views: ["View 1", "View 2 (turned ~120°)", "View 3 (turned ~240°)"],
     placeholder: "Connect a Prompt node to describe this location…",
+    aspectRatio: "16:9",
     layout:
       "The three panels are three photographs taken from the same spot while slowly turning in a circle: " +
       "Panel 1 (left) looks in one direction; Panel 2 (middle) is rotated about 120 degrees from it; " +
@@ -50,7 +55,7 @@ export const SHEET_CONFIGS: Record<SheetKind, SheetConfig> = {
 export function buildSheetPrompt(kind: SheetKind, description: string, hasReferences: boolean): string {
   const c = SHEET_CONFIGS[kind];
   return [
-    `A single 16:9 landscape image divided vertically into three equal side-by-side cards, separated by thin clean dividers. ` +
+    `A single ${c.aspectRatio} landscape image divided vertically into three equal side-by-side cards, separated by thin clean dividers. ` +
       `All three cards show the exact same ${c.subjectNoun}, kept consistent in design, colors, materials, proportions and style.`,
     c.layout,
     hasReferences
