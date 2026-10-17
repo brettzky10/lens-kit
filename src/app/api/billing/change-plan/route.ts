@@ -45,7 +45,13 @@ export async function POST(req: NextRequest) {
   if (subscription.cancelAtPeriodEnd) {
     return NextResponse.json({ error: "Resume your subscription before changing plans." }, { status: 409 });
   }
-  if (subscription.plan === plan) {
+  // Prisma types subscription.plan as the full Plan enum (incl. STANDARD);
+  // narrow it to a paid plan so it can index PLAN_CONFIGS.
+  const currentPlan = subscription.plan;
+  if (!isPaidPlan(currentPlan)) {
+    return NextResponse.json({ error: "Subscription has an unexpected plan." }, { status: 500 });
+  }
+  if (currentPlan === plan) {
     return NextResponse.json({ error: "You're already on this plan." }, { status: 400 });
   }
 
@@ -54,7 +60,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Missing ${PLAN_CONFIGS[plan].priceEnvVar} in the server environment.` }, { status: 500 });
   }
 
-  const upgrading = PLAN_RANK[plan] > PLAN_RANK[subscription.plan];
+  const upgrading = PLAN_RANK[plan] > PLAN_RANK[currentPlan];
 
   try {
     const current = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
@@ -73,7 +79,7 @@ export async function POST(req: NextRequest) {
 
     let bonusCredits = 0;
     if (upgrading) {
-      const diff = PLAN_CONFIGS[plan].creditsPerMonth - PLAN_CONFIGS[subscription.plan].creditsPerMonth;
+      const diff = PLAN_CONFIGS[plan].creditsPerMonth - PLAN_CONFIGS[currentPlan].creditsPerMonth;
       const total = periodEnd.getTime() - periodStart.getTime();
       const remaining = Math.min(1, Math.max(0, (periodEnd.getTime() - Date.now()) / total));
       bonusCredits = Math.round(diff * remaining);
