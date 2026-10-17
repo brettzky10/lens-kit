@@ -57,11 +57,17 @@ export default function NodeModelToolbar(props: Props) {
 
   const models: { value: string; label: string }[] = isVideo ? VIDEO_PROVIDERS : IMAGE_NODE_MODELS;
   const modelLabel = models.find((m) => m.value === provider)?.label ?? provider;
-  const aspects = isSheet ? [] : (isVideo ? VIDEO_ASPECT_RATIOS_BY_PROVIDER : IMAGE_ASPECT_RATIOS_BY_PROVIDER)[provider as never] ?? [];
-  const resolutions = (isVideo ? VIDEO_RESOLUTIONS_BY_PROVIDER : IMAGE_RESOLUTIONS_BY_PROVIDER)[provider as never] ?? [];
-  const durations = isVideo ? VIDEO_DURATIONS_BY_PROVIDER[provider as never] ?? [] : [];
-  const supportsAudio = isVideo && VIDEO_SUPPORTS_AUDIO[provider as never];
-  const supportsDraft = isVideo && VIDEO_SUPPORTS_DRAFT[provider as never];
+  // The option tables are keyed by specific provider unions; `provider` is a plain string here,
+  // so view them as string-keyed lookups (indexing with `as never` made every result `never`).
+  type OptionTable = Record<string, readonly string[] | undefined>;
+  const aspects: readonly string[] = isSheet
+    ? []
+    : ((isVideo ? VIDEO_ASPECT_RATIOS_BY_PROVIDER : IMAGE_ASPECT_RATIOS_BY_PROVIDER) as OptionTable)[provider] ?? [];
+  const resolutions: readonly string[] =
+    ((isVideo ? VIDEO_RESOLUTIONS_BY_PROVIDER : IMAGE_RESOLUTIONS_BY_PROVIDER) as OptionTable)[provider] ?? [];
+  const durations: readonly string[] = isVideo ? (VIDEO_DURATIONS_BY_PROVIDER as OptionTable)[provider] ?? [] : [];
+  const supportsAudio = isVideo && !!(VIDEO_SUPPORTS_AUDIO as Record<string, boolean | undefined>)[provider];
+  const supportsDraft = isVideo && !!(VIDEO_SUPPORTS_DRAFT as Record<string, boolean | undefined>)[provider];
   const draft = isVideo && data.draft === true;
   // route video changes through applyVideoPatch so invalid combos (Hailuo 1080p+10s, draft+1080p) are fixed
   const patchVideo = (p: Record<string, unknown>) => updateNodeData(id, applyVideoPatch(provider as never, data, p) as any);

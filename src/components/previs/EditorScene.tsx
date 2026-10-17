@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useCallback, useRef, useEffect, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Grid, OrbitControls, OrthographicCamera, TransformControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -39,7 +39,30 @@ export function EditorScene() {
   const pushHistory = usePrevisStore((s) => s.pushHistory);
 
   const refMap = useRef(new Map<string, THREE.Group>());
-  const cameraRef = useRef<THREE.Group>(null);
+  const cameraRef = useRef<THREE.Group | null>(null);
+
+  // Refs can't be read during render, but the gizmos need the actual objects
+  // as props. So the camera marker and proxy groups also report themselves
+  // into state through callback refs; render reads the state, effects /
+  // useFrame / handlers keep using the refs.
+  const [cameraObject, setCameraObject] = useState<THREE.Group | null>(null);
+  const setCameraMarker = useCallback((el: THREE.Group | null) => {
+    cameraRef.current = el;
+    setCameraObject(el);
+  }, []);
+
+  const [proxyObjects, setProxyObjects] = useState<Record<string, THREE.Group>>({});
+  const registerProxy = useCallback((id: string, el: THREE.Group | null) => {
+    if (el) refMap.current.set(id, el);
+    else refMap.current.delete(id);
+    setProxyObjects((prev) => {
+      if (el ? prev[id] === el : !(id in prev)) return prev;
+      const next = { ...prev };
+      if (el) next[id] = el;
+      else delete next[id];
+      return next;
+    });
+  }, []);
 
   // True while a gizmo drag is actively in progress. The ProxyAnimator and
   // camera sampler skip the dragged object during a drag so the gizmo stays
@@ -56,7 +79,7 @@ export function EditorScene() {
     prevCamPos.current = null;
   }, [gizmoMode, cameraSelected]);
 
-  const selectedProxyRef = selectedProxyId ? refMap.current.get(selectedProxyId) : undefined;
+  const selectedProxyObject = selectedProxyId ? proxyObjects[selectedProxyId] : undefined;
 
   // Proxy gizmo — update the base transform AND create a keyframe at the
   // current frame so the movement is recorded on the proxy's track.
@@ -204,17 +227,9 @@ export function EditorScene() {
         // `visible={false}` both skips rendering and excludes the object from
         // raycasting, so a hidden proxy can't be click-selected in 3D either.
         <group key={p.id} visible={p.visible !== false}>
-          <group
-            ref={(el) => {
-              if (el) refMap.current.set(p.id, el);
-              else refMap.current.delete(p.id);
-            }}
-            position={p.position}
-            rotation={p.rotation}
-            scale={p.scale}
-          >
+          <RegisteredGroup id={p.id} register={registerProxy} position={p.position} rotation={p.rotation} scale={p.scale}>
             <ProxyMesh proxy={p} selected={selectedProxyId === p.id} onSelect={selectProxy} interactive={viewMode !== "camera"} />
-          </group>
+          </RegisteredGroup>
           {viewMode === "plan" && (
             <SceneLabel text={p.label} position={[p.position[0], 1.2, p.position[2]]} color={p.color} height={0.45} bold />
           )}
@@ -226,13 +241,13 @@ export function EditorScene() {
       {viewMode !== "camera" && (
         <>
           {/* Draggable shot camera marker */}
-          <CameraMarker cameraRef={cameraRef} />
+          <CameraMarker markerRef={setCameraMarker} />
 
           {/* Gizmo for the selected proxy — perspective mode only, snaps to
               the grid when snapping is enabled, pushes one undo entry per drag. */}
-          {viewMode === "perspective" && selectedProxyRef && !cameraSelected && (
+          {viewMode === "perspective" && selectedProxyObject && !cameraSelected && (
             <TransformControls
-              object={selectedProxyRef}
+              object={selectedProxyObject}
               mode={gizmoMode}
               onObjectChange={handleProxyGizmoChange}
               onMouseDown={() => { draggingRef.current = true; pushHistory(); }}
@@ -245,9 +260,9 @@ export function EditorScene() {
           {/* Gizmo for the selected camera — hidden during playback so it
               doesn't fight the trajectory animation. Local space so the rotate
               rings map to pan / tilt / roll (roll = the ring around the lens). */}
-          {viewMode === "perspective" && cameraSelected && cameraRef.current && !isPlaying && (
+          {viewMode === "perspective" && cameraSelected && cameraObject && !isPlaying && (
             <TransformControls
-              object={cameraRef.current}
+              object={cameraObject}
               mode={gizmoMode === "scale" ? "translate" : gizmoMode}
               space={gizmoMode === "rotate" ? "local" : "world"}
               onObjectChange={handleCameraGizmoChange}
@@ -319,7 +334,7 @@ export function EditorScene() {
  * keyframe in real-time, so the user is "driving" the camera keyframe directly.
  */
 function CameraFlyController() {
-  const { camera, gl } = useThree();
+  const { gl } = useThree();
   const keyframes = usePrevisStore((s) => s.keyframes);
   const durationFrames = usePrevisStore((s) => s.durationFrames);
   const currentFrame = usePrevisStore((s) => s.currentFrame);
@@ -440,8 +455,12 @@ function CameraFlyController() {
   }, [gl]);
 
   // --- Per-frame: apply WASD movement + update camera + sync keyframe ---
-  useFrame((_, dt) => {
-    if (!(camera instanceof THREE.PerspectiveCamera)) return;
+  // Read camera/renderer from the frame state (not the useThree() values captured at
+  // render) so this callback doesn't mutate render-scoped variables.
+  useFrame((state, dt) => {
+    const cam = state.camera;
+    const renderer = state.gl;
+    if (!(cam instanceof THREE.PerspectiveCamera)) return;
     if (!livePos.current || !liveTarget.current) return;
 
     // If not playing, allow WASD to move the camera.
@@ -504,21 +523,21 @@ function CameraFlyController() {
     }
 
     // Apply to the actual editor camera
-    camera.position.copy(livePos.current);
-    camera.lookAt(liveTarget.current);
+    cam.position.copy(livePos.current);
+    cam.lookAt(liveTarget.current);
     // Roll (dutch angle) + animated focal come from the keyframe channels.
     const s = usePrevisStore.getState();
     const frameNow = Math.round(s.currentFrame);
     const rollNow = sampleChannel1D(s.cameraChannels.roll, frameNow);
-    camera.rotateZ(THREE.MathUtils.degToRad(rollNow));
+    cam.rotateZ(THREE.MathUtils.degToRad(rollNow));
     const focalNow = s.cameraChannels.focal.length > 0 ? sampleChannel1D(s.cameraChannels.focal, frameNow) : null;
-    camera.fov = focalToFov(focalNow ?? focalLength);
+    cam.fov = focalToFov(focalNow ?? focalLength);
 
     // Letterbox the WebGL viewport to the target aspect ratio so the render
     // matches the camera's framing (no stretching). The areas outside the
     // letterbox are covered by CSS bars in PrevisStage.
     const targetAspect = aspectRatioValue(aspectRatio);
-    const canvas = gl.domElement;
+    const canvas = renderer.domElement;
     const bufW = canvas.width;
     const bufH = canvas.height;
     const canvasAspect = bufW / bufH;
@@ -538,11 +557,11 @@ function CameraFlyController() {
       vpY = Math.round((bufH - vpH) / 2);
     }
 
-    gl.setViewport(vpX, vpY, vpW, vpH);
-    gl.setScissor(vpX, vpY, vpW, vpH);
-    gl.setScissorTest(true);
-    camera.aspect = targetAspect;
-    camera.updateProjectionMatrix();
+    renderer.setViewport(vpX, vpY, vpW, vpH);
+    renderer.setScissor(vpX, vpY, vpW, vpH);
+    renderer.setScissorTest(true);
+    cam.aspect = targetAspect;
+    cam.updateProjectionMatrix();
   });
 
   // Restore full viewport when unmounting (switching back to Perspective mode)
@@ -645,8 +664,9 @@ function PerspectiveWASD() {
     };
   }, [gl, camera, controls]);
 
-  useFrame((_, dt) => {
-    if (!(camera instanceof THREE.PerspectiveCamera)) return;
+  useFrame((state, dt) => {
+    const cam = state.camera;
+    if (!(cam instanceof THREE.PerspectiveCamera)) return;
 
     // --- Free-look: apply yaw/pitch to camera orientation while RMB held ---
     if (rmb.current) {
@@ -655,8 +675,8 @@ function PerspectiveWASD() {
         Math.sin(pitch.current),
         Math.cos(yaw.current) * Math.cos(pitch.current),
       );
-      const target = camera.position.clone().add(dir);
-      camera.lookAt(target);
+      const target = cam.position.clone().add(dir);
+      cam.lookAt(target);
     }
 
     // --- WASD/QE movement (only while RMB held, UE5-style) ---
@@ -666,7 +686,7 @@ function PerspectiveWASD() {
 
     // Forward = actual view direction (with pitch), like UE5
     const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
+    cam.getWorldDirection(forward);
     const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
 
     // Shift = 3× speed boost (UE5 convention)
@@ -679,9 +699,9 @@ function PerspectiveWASD() {
     if (k.has("e")) move.y += speed;
     if (k.has("q")) move.y -= speed;
 
-    camera.position.add(move);
+    cam.position.add(move);
     // Move the orbit target with the camera so LMB-orbit stays centered
-    const orbitTarget = (controls as unknown as { target?: THREE.Vector3 } | null)?.target;
+    const orbitTarget = (state.controls as unknown as { target?: THREE.Vector3 } | null)?.target;
     if (orbitTarget) orbitTarget.add(move);
   });
 
@@ -698,7 +718,7 @@ function FrameSelected({
   cameraRef,
 }: {
   refMap: React.MutableRefObject<Map<string, THREE.Group>>;
-  cameraRef: React.RefObject<THREE.Group>;
+  cameraRef: React.RefObject<THREE.Group | null>;
 }) {
   const { camera, controls } = useThree();
 
@@ -794,6 +814,34 @@ function AxisVectors() {
         <cylinderGeometry args={[0.01, 0.01, 1, 6]} />
         <meshBasicMaterial color="#22c55e" />
       </mesh>
+    </group>
+  );
+}
+
+/**
+ * A <group> that reports its THREE.Group to `register` via a stable callback
+ * ref (the callback only changes when the id/register change, so it isn't
+ * re-run on every render).
+ */
+function RegisteredGroup({
+  id,
+  register,
+  position,
+  rotation,
+  scale,
+  children,
+}: {
+  id: string;
+  register: (id: string, el: THREE.Group | null) => void;
+  position: THREE.Vector3Tuple;
+  rotation: THREE.Vector3Tuple;
+  scale: THREE.Vector3Tuple;
+  children?: React.ReactNode;
+}) {
+  const ref = useCallback((el: THREE.Group | null) => register(id, el), [id, register]);
+  return (
+    <group ref={ref} position={position} rotation={rotation} scale={scale}>
+      {children}
     </group>
   );
 }

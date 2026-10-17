@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
-
-const STARTER_CREDITS = 1000;
+import { getOrCreateUser } from "@/lib/actions/user";
 
 export interface CreditGuardSuccess {
   ok: true;
@@ -23,7 +22,7 @@ export type CreditGuardResult = CreditGuardSuccess | CreditGuardFailure;
  * a successful result.
  */
 export async function requireCredits(cost: number): Promise<CreditGuardResult> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user: authUser },
   } = await supabase.auth.getUser();
@@ -38,26 +37,9 @@ export async function requireCredits(cost: number): Promise<CreditGuardResult> {
     };
   }
 
-  // First time we've seen this Supabase user — create their Prisma row,
-  // using the Supabase UUID directly as the primary key (no separate
-  // "supabaseId" column needed).
-  let user = await prisma.user.findUnique({ where: { id: authUser.id } });
-  if (!user) {
-    const meta = authUser.user_metadata as Record<string, unknown> | undefined;
-    user = await prisma.user.create({
-      data: {
-        id: authUser.id,
-        email: authUser.email ?? `${authUser.id}@unknown.local`,
-        name:
-          (meta?.full_name as string | undefined) ??
-          (meta?.name as string | undefined) ??
-          authUser.email?.split("@")[0] ??
-          "User",
-        image: (meta?.avatar_url as string | undefined) ?? "",
-        credits: STARTER_CREDITS,
-      },
-    });
-  }
+  // Creates the Prisma row on first sight (0 credits) and applies the free
+  // monthly grant if one is due, so user.credits below is already up to date.
+  const user = await getOrCreateUser(authUser);
 
   if (cost > 0 && user.credits < cost) {
     return {

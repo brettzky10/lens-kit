@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { FileText, Camera, Aperture, ImageIcon, Film, User, Box, Mountain, ImagePlus, Clapperboard, ArrowUpCircle, Palette } from "lucide-react";
 import {
   Command,
   CommandGroup,
@@ -11,8 +10,13 @@ import {
   CommandEmpty,
 } from "@/components/ui/command";
 import { NODE_TYPE_META, type FlowNodeType } from "@/lib/types";
+import {
+  FileText, Camera, Aperture, ImageIcon, Film, User, Box, Mountain,
+  ImagePlus, Clapperboard, ArrowUpCircle, Palette,
+  type LucideIcon,
+} from "lucide-react";
 
-const ICONS: Record<FlowNodeType, React.ElementType> = {
+const ICONS: Record<FlowNodeType, LucideIcon> = {
   prompt: FileText,
   camera: Camera,
   lens: Aperture,

@@ -32,7 +32,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 export function TrajectoryVisual({
   cameraRef,
 }: {
-  cameraRef: React.RefObject<THREE.Group>;
+  cameraRef: React.RefObject<THREE.Group | null>;
 }) {
   const keyframes = usePrevisStore((s) => s.keyframes);
   const cameraChannels = usePrevisStore((s) => s.cameraChannels);
@@ -193,9 +193,10 @@ export function TrajectoryVisual({
  * uses -Z). So the lens is on +Z to face the subject.
  */
 export function CameraMarker({
-  cameraRef,
+  markerRef,
 }: {
-  cameraRef: React.RefObject<THREE.Group>;
+  /** Ref (usually a callback ref) that receives the marker's THREE.Group. */
+  markerRef: React.Ref<THREE.Group>;
 }) {
   const cameraSelected = usePrevisStore((s) => s.cameraSelected);
   const selectCamera = usePrevisStore((s) => s.selectCamera);
@@ -206,7 +207,7 @@ export function CameraMarker({
   const emissiveIntensity = cameraSelected ? 0.5 : 0.15;
 
   return (
-    <group ref={cameraRef}>
+    <group ref={markerRef}>
       {/* Invisible larger hitbox for easier clicking */}
       <mesh
         onClick={(e) => {

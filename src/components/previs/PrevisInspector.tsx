@@ -45,7 +45,7 @@ export function PrevisInspector({
   beginHiResCapture,
   endHiResCapture,
 }: {
-  viewfinderCanvasRef: React.RefObject<HTMLCanvasElement>;
+  viewfinderCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   /** Bumps the Shot View canvas's native pixel resolution to match a target
    *  export height before recording starts (see PrevisStage for why). */
   beginHiResCapture: (targetHeight: number) => Promise<void>;
@@ -344,7 +344,7 @@ function PromptAndGenerate({
   beginHiResCapture,
   endHiResCapture,
 }: {
-  viewfinderCanvasRef: React.RefObject<HTMLCanvasElement>;
+  viewfinderCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   beginHiResCapture: (targetHeight: number) => Promise<void>;
   endHiResCapture: () => void;
 }) {
