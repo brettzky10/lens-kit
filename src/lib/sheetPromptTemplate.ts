@@ -25,7 +25,14 @@ REFERENCE IMAGE PRIORITY:
 `.trim()
     : "";
 
-  return [config.layoutInstructions, subjectDescription, referenceNote, `Generate the final ${config.subjectNoun} sheet now.`]
+  // The config's `layout` only holds the per-panel instructions, so add the
+  // three-card framing here (same wording as buildSheetPrompt in sheetConfig.ts).
+  const intro =
+    `A single ${config.aspectRatio} landscape image divided vertically into three equal side-by-side cards, separated by thin clean dividers. ` +
+    `All three cards show the exact same ${config.subjectNoun}, kept consistent in design, colors, materials, proportions and style.`;
+  const noText = "No text, captions, labels, numbers or watermarks anywhere in the image.";
+
+  return [intro, config.layout, subjectDescription, referenceNote, noText, `Generate the final ${config.subjectNoun} sheet now.`]
     .filter(Boolean)
     .join("\n\n");
 }
